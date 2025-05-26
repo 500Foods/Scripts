@@ -9,17 +9,20 @@ This repository contains a hodgepodge collection of mostly BASH scripts. Some ar
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2025-05-26 19:28:03 UTC
+Last updated at 2025-05-26 19:30:13 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Bourne Shell                     2             46             66            333
-YAML                             2              8             13             35
+YAML                             2              8             13             37
 Markdown                         2              5              2             23
 -------------------------------------------------------------------------------
-SUM:                             6             59             81            391
+SUM:                             6             59             81            393
 -------------------------------------------------------------------------------
-3 Files (without source code) were skipped
+3 Files were skipped (duplicate, binary, or without source code):
+  gitattributes: 1
+  gitignore: 1
+  license: 1
 ```
 <!--CLOC-END-->
 
