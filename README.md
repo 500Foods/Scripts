@@ -3,7 +3,7 @@ This repository contains a hodgepodge collection of mostly BASH scripts. Some ar
 
 ## GitHub
 [GitHubSync](https://github.com/500Foods/Scripts/blob/main/githubsync/githubsync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism
-
+[CLOC](https://github.com/500Foods/Scripts/blob/main/cloc/cloc.md) - Add "count lines of code" to the README.md of a GitHub repository
 
 ## Repository Information 
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
