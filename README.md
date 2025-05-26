@@ -8,8 +8,8 @@ This repository contains a hodgepodge collection of mostly BASH scripts. Some ar
 ## Repository Information 
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
-```
-Last updated at 2025-05-26 19:27:21 UTC
+```cloc
+Last updated at 2025-05-26 19:28:03 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
