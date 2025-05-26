@@ -8,16 +8,16 @@ GitHubSync - Sync GitHub repositories with local copies, mostly intended as a ba
 ## Repository Information 
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
-```cloc
-Last updated at 2025-05-26 19:22:20 UTC
+```
+Last updated at 2025-05-26 19:24:53 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Bourne Shell                     2             46             66            333
 YAML                             2              8             13             35
-Markdown                         1              3              2             19
+Markdown                         1              4              2             21
 -------------------------------------------------------------------------------
-SUM:                             5             57             81            387
+SUM:                             5             58             81            389
 -------------------------------------------------------------------------------
 3 Files (without source code) were skipped
 ```
