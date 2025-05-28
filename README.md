@@ -1,25 +1,29 @@
 # Scripts
 
-This repository contains a hodgepodge collection of mostly BASH scripts. Some are generic enough to be useful to many others. Some are highly specific and might not be useful to anyone else at all. Many were created with the help of an AI model, typically Grok 2, Grok 3 or one of the Claude variants. They're pretty good at sorting out things like awk parameters or handling formatting of numbers and dates - not exactly BASH's strong suit after all.
+This repository contains a collection of scripts and utilities. Some are generic enough to be useful to many others. Some are highly specific and might not be useful to anyone else at all. Many were created with the help of an AI model, typically Grok 2, Grok 3 or one of the Claude variants. They're pretty good at sorting out things like awk parameters or handling formatting of numbers and dates - not exactly BASH's strong suit after all.
 
 ## Files
 
-- findoldest.sh
-- topfiles.sh
-- topdirs.sh
-- topcounts.sh
+These scripts help analyze and manage files and directories:
 
-Dates
+- [Find Oldest](https://github.com/500Foods/Scripts/blob/main/files/findoldest.md) - Find oldest files in a directory tree with detailed stats and date filtering (BASH)
+- [Top Files](https://github.com/500Foods/Scripts/blob/main/files/topfiles.md) - List largest files (>1MB) in a directory tree (Python)
+- [Top Directories](https://github.com/500Foods/Scripts/blob/main/files/topdirs.md) - List directories by total size in MB (Python)
+- [Top Counts](https://github.com/500Foods/Scripts/blob/main/files/topcounts.md) - List directories containing the most files (Python)
 
-- uptime-fancy.sh
-- weeknumber.sh
-  
+## Dates
+
+These scripts help with date and time operations:
+
+- [Uptime Fancy](https://github.com/500Foods/Scripts/blob/main/dates/uptime-fancy.md) - Show system uptime with week number in a compact format (BASH)
+- [Week Number](https://github.com/500Foods/Scripts/blob/main/dates/weeknumber.md) - Calculate ISO week numbers with formatted date output (Python)
+
 ## GitHub
 
-These scripts are helpful when dealing with GitHub repositories.
+These tools help manage GitHub repositories:
 
-- [GitHubSync](https://github.com/500Foods/Scripts/blob/main/githubsync/githubsync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism
-- [CLOC](https://github.com/500Foods/Scripts/blob/main/cloc/cloc.md) - Add "count lines of code" to the README.md of a GitHub repository
+- [GitHubSync](https://github.com/500Foods/Scripts/blob/main/githubsync/githubsync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
+- [CLOC](https://github.com/500Foods/Scripts/blob/main/cloc/cloc.md) - Add "count lines of code" to the README.md of a GitHub repository (GitHub Action)
 
 ## Repository Information
 
