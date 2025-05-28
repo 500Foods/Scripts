@@ -379,6 +379,55 @@ th, td {
 
 ## Special Features
 
+### Project Age Tracking with .project_start
+
+The `.project_start` file is a special marker used to accurately track a project's true age, independent of Git history or file modifications.
+
+1. **Purpose**:
+   - Marks the actual project start date
+   - Ensures accurate age reporting in sync reports
+   - Overrides file timestamp-based age calculation
+
+2. **Implementation**:
+   ```bash
+   # Create .project_start with specific date
+   touch -t 202001010000 .project_start  # Sets Jan 1, 2020
+   
+   # Or use current date for new projects
+   touch .project_start
+   ```
+
+3. **Git Configuration**:
+   ```bash
+   # Add to .gitignore to keep it local
+   echo ".project_start" >> .gitignore
+   
+   # Or commit it to share project age across clones
+   git add .project_start
+   git commit -m "chore: add project start date marker"
+   ```
+
+4. **Usage Considerations**:
+   - Add at project creation for accurate tracking
+   - Use with existing projects by setting historical date
+   - Choose between local or shared tracking
+   - Can be used per branch for feature age tracking
+
+5. **Best Practices**:
+   - Document the rationale if setting historical date
+   - Consider timezone implications
+   - Use consistent date format (YYYYMMDDHHMM)
+   - Include in project setup documentation
+
+6. **Advanced Usage**:
+   ```bash
+   # Set specific timestamp including time
+   touch -t $(date -d "2020-01-01 09:00:00" +%Y%m%d%H%M) .project_start
+   
+   # View current project age
+   find . -name .project_start -exec stat -c %y {} \;
+   ```
+
 ### Age and Activity Tracking
 - **Age**: Time since project creation (uses .project_start file if present)
 - **Activity**: Time since last file modification
