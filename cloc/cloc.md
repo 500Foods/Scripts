@@ -15,6 +15,7 @@ This GitHub Action automatically counts lines of code in your repository and mai
 
 1. **Add the Workflow File**:
    Create `.github/workflows/cloc.yml`:
+
    ```yaml
    name: Count Lines of Code
    on:
@@ -36,6 +37,7 @@ This GitHub Action automatically counts lines of code in your repository and mai
 
 2. **Prepare README.md**:
    Add these markers where you want the statistics to appear:
+
    ```markdown
    <!--CLOC-START -->
    Statistics will appear here
@@ -55,9 +57,11 @@ This GitHub Action automatically counts lines of code in your repository and mai
 ### Available Options
 
 1. **Language Mapping**:
+
    ```yaml
    --force-lang=Language,extension
    ```
+
    Example: `--force-lang=Pascal,inc` counts .inc files as Pascal
 
 2. **Output Files**:
@@ -65,6 +69,7 @@ This GitHub Action automatically counts lines of code in your repository and mai
    - `--ignored=cloc-ignored.txt`: List of ignored files
 
 3. **Custom Filters**:
+
    ```yaml
    options: --exclude-dir=vendor,node_modules --exclude-ext=json,md
    ```
@@ -72,6 +77,7 @@ This GitHub Action automatically counts lines of code in your repository and mai
 ## Output Format
 
 The action generates a formatted output like this:
+
 ```cloc
 Last updated at 2025-05-26 19:34:20 UTC
 -------------------------------------------------------------------------------
@@ -95,6 +101,7 @@ SUM:                          48           1924           1135          10368
 ### 1. Modifying Output Format
 
 The workflow splits and reconstructs the README.md file:
+
 ```yaml
 - run: csplit README.md /\<\!--CLOC/ {1}
 - run: cp xx00 README.md
@@ -108,7 +115,9 @@ The workflow splits and reconstructs the README.md file:
 - run: |
     awk '{sub(/:.*/,""); ext=tolower($1); ext=substr(ext, match(ext, /[^\/]*$/)); ext=substr(ext, match(ext, /\.[^.]*$/)+1); counts[ext]++} END {for(i in counts) {printf("  %s: %d\n",i,counts[i])}}' cloc-ignored.txt | sort -t: -k2nr -k1 >> README.md
 ```
+
 This script:
+
 - Processes ignored files
 - Groups by extension
 - Sorts by count and name
@@ -175,6 +184,7 @@ on:
 ### 3. Custom Processing
 
 Add additional steps for custom statistics:
+
 ```yaml
 - name: Custom Statistics
   run: |

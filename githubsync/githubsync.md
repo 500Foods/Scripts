@@ -5,6 +5,7 @@ GitHubSync is a robust solution for maintaining synchronized copies of GitHub re
 ## Quick Start Guide
 
 1. **First-Time Setup**:
+
    ```bash
    # Clone this repository
    git clone git@github.com:500Foods/Scripts.git
@@ -18,6 +19,7 @@ GitHubSync is a robust solution for maintaining synchronized copies of GitHub re
    ```
 
 2. **Basic Usage**:
+
    ```bash
    # Single repository backup
    ./githubsync.sh owner/repo R /backup/path
@@ -27,6 +29,7 @@ GitHubSync is a robust solution for maintaining synchronized copies of GitHub re
    ```
 
 3. **Verify It's Working**:
+
    ```bash
    # Check the logs
    tail -f ~/githubsync_logs/githubsync_*.log
@@ -79,6 +82,7 @@ crontab -e
 ### Initial Setup Guide
 
 1. **Setting up SSH for GitHub**:
+
    ```bash
    # Generate an SSH key (press Enter for default options)
    ssh-keygen -t rsa -b 4096 -C "your.email@example.com"
@@ -92,20 +96,23 @@ crontab -e
    # Copy your public key (you'll add this to GitHub)
    cat ~/.ssh/id_rsa.pub
    ```
+
    Then:
    - Go to GitHub.com → Settings → SSH Keys
    - Click "New SSH Key"
    - Paste your key and save
 
-4. **SSH Configuration** (Important for Custom Setups):
+1. **SSH Configuration** (Important for Custom Setups):
+
    ```bash
    # Create or edit SSH config file
    mkdir -p ~/.ssh
    nano ~/.ssh/config
    ```
-   
+
    Basic SSH config for GitHub:
-   ```
+
+   ```config
    # Default GitHub configuration
    Host github.com
        HostName github.com
@@ -119,7 +126,8 @@ crontab -e
    ```
 
    Additional useful SSH settings:
-   ```
+
+   ```config
    Host github.com
        HostName github.com
        User git
@@ -136,6 +144,7 @@ crontab -e
    ```
 
    Save the file and set permissions:
+
    ```bash
    chmod 600 ~/.ssh/config
    ```
@@ -145,7 +154,8 @@ crontab -e
    - The SSH config file lets you set different ports for different hosts
    - Always use port 22 for github.com while maintaining other ports for other connections
 
-5. **Setting up Email Notifications** (Optional):
+1. **Setting up Email Notifications** (Optional):
+
    ```bash
    # Install mutt (email client) if needed
    # For Ubuntu/Debian:
@@ -163,9 +173,11 @@ crontab -e
    # Secure the config file
    chmod 600 ~/.muttrc
    ```
+
    Note: For Gmail, use an App Password, not your regular password
 
-3. **Quick Test**:
+1. **Quick Test**:
+
    ```bash
    # Test SSH connection to GitHub
    ssh -T git@github.com
@@ -178,6 +190,7 @@ crontab -e
 ### Understanding Cron Jobs (for Automation)
 
 Cron is like a scheduler for your computer. It runs commands at specified times:
+
 ```bash
 # Structure of a cron job:
 # Minute Hour Day Month DayOfWeek Command
@@ -225,6 +238,7 @@ Cron is like a scheduler for your computer. It runs commands at specified times:
 ```
 
 Example for a Single Repository:
+
 ```bash
 # Create log directory
 mkdir -p ~/github_logs
@@ -237,12 +251,14 @@ tail -f ~/github_logs/githubsync_500Foods-Scripts_*.log
 ```
 
 Parameters:
+
 - `repo`: GitHub repository in format "owner/repo"
 - `access`: Access mode - "R" (read-only) or "RW" (read-write)
 - `local_path`: Local directory path for the repository
 - `--log-dir`: (Optional) Custom log directory path
 
 Examples:
+
 ```bash
 # Read-only sync
 ./githubsync.sh 500Foods/Scripts R /path/to/local/Scripts
@@ -258,12 +274,14 @@ Examples:
 ```
 
 The repo list file should contain one repository per line in the format:
-```
+
+```config
 owner/repo access local_path
 ```
 
 Example repo_list.txt:
-```
+
+```config
 500Foods/Scripts R /path/to/Scripts
 500Foods/MyApp RW /path/to/MyApp
 ```
@@ -271,11 +289,14 @@ Example repo_list.txt:
 ## Configuration
 
 ### githubsync.sh Configuration
+
 - Default log directory: `$HOME/githubsync_logs`
 - SSH key path: `~/.ssh/id_rsa`
 
 ### sync_all.sh Configuration
+
 Edit these variables at the top of sync_all.sh:
+
 ```bash
 GITHUBSYNC_PATH="/path/to/githubsync.sh"  # Path to githubsync.sh
 EMAIL="your@email.com"                     # Email for reports
@@ -286,6 +307,7 @@ MUTT_CMD="mutt"                           # Email command
 ## Logging and Reports
 
 ### Log Files
+
 - Individual sync logs: `<log_dir>/githubsync_<repo>_<timestamp>.log`
 - Batch sync logs: `<log_dir>/sync_all_<timestamp>.log`
 
@@ -310,6 +332,7 @@ The sync_all.sh script includes a sophisticated HTML email reporting system that
 ### Repository Metrics
 
 Each repository entry includes:
+
 - **Age**: Project lifetime in years/months/days format
 - **Activity**: Time since last modification
 - **Repository**: Link to GitHub repository
@@ -323,6 +346,7 @@ Each repository entry includes:
 ### Summary Statistics
 
 The report footer provides aggregate data:
+
 - Total number of repositories
 - Maximum project age
 - Minimum activity period
@@ -333,6 +357,7 @@ The report footer provides aggregate data:
 ### Customization Options
 
 The email template can be customized by modifying the HTML/CSS in sync_all.sh:
+
 ```css
 /* Example of built-in styles */
 table { 
@@ -351,6 +376,7 @@ th, td {
 ### Email Configuration
 
 1. **Basic Setup**:
+
    ```bash
    EMAIL="your@email.com"     # Recipient address
    MUTT_CMD="mutt"           # Email command
@@ -389,6 +415,7 @@ The `.project_start` file is a special marker used to accurately track a project
    - Overrides file timestamp-based age calculation
 
 2. **Implementation**:
+
    ```bash
    # Create .project_start with specific date
    touch -t 202001010000 .project_start  # Sets Jan 1, 2020
@@ -398,6 +425,7 @@ The `.project_start` file is a special marker used to accurately track a project
    ```
 
 3. **Git Configuration**:
+
    ```bash
    # Add to .gitignore to keep it local
    echo ".project_start" >> .gitignore
@@ -420,6 +448,7 @@ The `.project_start` file is a special marker used to accurately track a project
    - Include in project setup documentation
 
 6. **Advanced Usage**:
+
    ```bash
    # Set specific timestamp including time
    touch -t $(date -d "2020-01-01 09:00:00" +%Y%m%d%H%M) .project_start
@@ -429,16 +458,19 @@ The `.project_start` file is a special marker used to accurately track a project
    ```
 
 ### Age and Activity Tracking
+
 - **Age**: Time since project creation (uses .project_start file if present)
 - **Activity**: Time since last file modification
 - Format: "XyYmZd" (years, months, days)
 
 ### Size Tracking
+
 - Repository sizes tracked in MB
 - Formatted with thousands separators
 - Total size calculation for all repositories
 
 ### Change Tracking
+
 - Counts of files pushed and pulled
 - Duration of sync operations
 - Success/failure status for each operation
@@ -446,6 +478,7 @@ The `.project_start` file is a special marker used to accurately track a project
 ## Error Handling
 
 The scripts include comprehensive error handling for:
+
 - Invalid repository formats
 - SSH key issues
 - Directory creation failures
@@ -457,6 +490,7 @@ The scripts include comprehensive error handling for:
 ### Sync Jobs
 
 1. **Single Repository Daily Sync**
+
 ```bash
 # Edit crontab
 crontab -e
@@ -465,7 +499,8 @@ crontab -e
 0 2 * * * /path/to/githubsync.sh 500Foods/Scripts RW /fvl/git/500Foods/Scripts --log-dir /path/to/logs
 ```
 
-2. **Multiple Repositories Sync (Twice Daily)**
+1. **Multiple Repositories Sync (Twice Daily)**
+
 ```bash
 # Sync all repositories at 2 AM and 2 PM
 0 2,14 * * * /path/to/sync_all.sh /path/to/repos.txt
@@ -474,13 +509,15 @@ crontab -e
 ### Log Management
 
 1. **Weekly Log Cleanup (Keep Last 30 Days)**
+
 ```bash
 # Add to crontab
 0 3 * * 0 find /path/to/logs -name "githubsync_*.log" -mtime +30 -delete
 0 3 * * 0 find /path/to/logs -name "sync_all_*.log" -mtime +30 -delete
 ```
 
-2. **Monthly Log Archive**
+1. **Monthly Log Archive**
+
 ```bash
 # Archive logs older than 30 days to a compressed file
 0 4 1 * * cd /path/to/logs && tar czf logs_$(date +\%Y\%m).tar.gz githubsync_*.log sync_all_*.log --older-than='30 days' --remove-files
@@ -490,7 +527,7 @@ crontab -e
 
 1. **Stagger Job Timing**:
    - Space out jobs to avoid resource contention
-   - Use random minutes (e.g., 23 2 * * *) to avoid peak times
+   - Use random minutes (e.g., `23 2 * * *`) to avoid peak times
 
 2. **Log Rotation**:
    - Keep logs for a reasonable duration (e.g., 30-90 days)
@@ -500,6 +537,7 @@ crontab -e
 3. **Error Handling**:
    - Redirect cron output to a log file
    - Consider using a wrapper script for error notifications
+
    ```bash
    23 2 * * * /path/to/sync_all.sh /path/to/repos.txt 2>&1 | mail -s "Sync Result" admin@example.com
    ```
@@ -514,6 +552,7 @@ crontab -e
    - Archive backup: Weekly full backups with compression
 
 2. **Backup Verification**:
+
    ```bash
    # Add to your sync scripts
    git fsck --full
@@ -533,6 +572,7 @@ crontab -e
    - Consider network bandwidth usage
 
 2. **Load Distribution**:
+
    ```bash
    # Example of staggered sync times in crontab
    15 */4 * * * /path/to/sync_all.sh /path/to/critical-repos.txt
@@ -547,6 +587,7 @@ crontab -e
 ### Performance Optimization
 
 1. **Git Configuration**:
+
    ```bash
    # Add to your global git config
    git config --global core.compression 9
@@ -563,6 +604,7 @@ crontab -e
 ### Monitoring and Alerting
 
 1. **System Monitoring**:
+
    ```bash
    # Check disk space before sync
    df -h /path/to/repos | awk 'NR==2 {if ($5+0 > 85) exit 1}'
@@ -577,6 +619,7 @@ crontab -e
    - Track sync duration anomalies
 
 3. **Health Checks**:
+
    ```bash
    # Example health check script
    #!/bin/bash
@@ -595,6 +638,7 @@ crontab -e
    - Regular key rotation schedule
 
 2. **Data Protection**:
+
    ```bash
    # Encrypt sensitive logs
    gpg --encrypt --recipient "backup@company.com" logfile.log
