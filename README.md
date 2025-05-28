@@ -14,21 +14,20 @@ These scripts are helpful when dealing with GitHub repositories.
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2025-05-28 00:43:58 UTC
+Last updated at 2025-05-28 00:48:53 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Markdown                         3            190              4            685
 Bourne Shell                     2             46             66            333
-YAML                             2              8             13             37
+YAML                             3             16             26             72
 -------------------------------------------------------------------------------
-SUM:                             7            244             83           1055
+SUM:                             8            252             96           1090
 -------------------------------------------------------------------------------
-4 Files were skipped (duplicate, binary, or without source code):
+3 Files were skipped (duplicate, binary, or without source code):
   gitattributes: 1
   gitignore: 1
   license: 1
-  yml: 1
 ```
 <!--CLOC-END-->
 
