@@ -10,7 +10,7 @@ A BASH script that combines the current week number with a nicely formatted syst
 
 ## Example Output
 
-```
+```console
 2024-01-15 (Mon) W03 Up: 5d 2h 30m
 ```
 
@@ -23,11 +23,13 @@ A BASH script that combines the current week number with a nicely formatted syst
 ## Installation
 
 1. Make the script executable:
+
    ```bash
    chmod +x uptime-fancy.sh
    ```
 
 2. Ensure the script is in your PATH:
+
    ```bash
    # Add to ~/.bashrc or ~/.zshrc
    export PATH="/path/to/scripts/dates:$PATH"

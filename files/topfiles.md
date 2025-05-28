@@ -13,7 +13,7 @@ A Python script that finds the largest files (above 1MB) in a directory tree.
 
 ## Example Output
 
-```
+```console
 Index  Size (MB)  Filename
     1    256.4  /path/to/large1.iso
     2    128.7  /path/to/large2.zip

@@ -14,7 +14,7 @@ A Python script that calculates and displays ISO week numbers along with formatt
 
 ## Example Output
 
-```
+```console
 2024-01-15 (Mon) W02
 ```
 
@@ -29,11 +29,13 @@ A Python script that calculates and displays ISO week numbers along with formatt
 ## Installation
 
 1. Make the script executable:
+
    ```bash
    chmod +x weeknumber.py
    ```
 
 2. Ensure the script is in your PATH:
+
    ```bash
    # Add to ~/.bashrc or ~/.zshrc
    export PATH="/path/to/scripts/dates:$PATH"

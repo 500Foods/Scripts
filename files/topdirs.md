@@ -13,7 +13,7 @@ A Python script that finds the largest directories (by total size) in a director
 
 ## Example Output
 
-```
+```console
 Index  Size (MB)  Directory
     1    1024.5  /path/to/dir1
     2     756.2  /path/to/dir2

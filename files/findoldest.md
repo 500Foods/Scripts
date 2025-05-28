@@ -20,7 +20,7 @@ A BASH script that finds the oldest files in a directory tree with detailed file
 
 ## Example Output
 
-```
+```console
 -rw-r--r--  1 user group    1234 2024-01-15 10:30:45.123 +0000 /path/to/oldfile.txt
 ```
 

@@ -13,7 +13,7 @@ A Python script that finds directories containing the most files in a directory 
 
 ## Example Output
 
-```
+```console
 Index  Counts  Directory
     1     523  /path/to/dir1
     2     342  /path/to/dir2
