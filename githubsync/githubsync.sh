@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # githubsync.sh
+# 
+# 2025-06-08 20:44
+#
 # Usage: githubsync.sh <repo> <access> <local_path> [--log-dir <log_dir>] [--debug]
 # Example: githubsync.sh 500Foods/Zoomer RW /fvl/git/500Foods/Zoomer --log-dir /fvl/git/logs --debug
 # Syncs a local Git repo with GitHub, pulls remote changes, and pushes local changes (if RW).
