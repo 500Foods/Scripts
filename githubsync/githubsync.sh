@@ -80,6 +80,20 @@ log() {
     fi
 }
 
+# Log file list (write to file and console if debug)
+log_file_list() {
+    local prefix="$1"
+    local files="$2"
+    echo "$prefix" >> "$LOGFILE"
+    if [ -n "$files" ]; then
+        echo "$files" >> "$LOGFILE"
+        if [ "$DEBUG" = true ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $prefix"
+            echo "$files"
+        fi
+    fi
+}
+
 # Start SSH agent and ensure cleanup
 log "Starting SSH agent."
 eval "$(ssh-agent -s)" > /dev/null
@@ -119,6 +133,17 @@ log "Current directory: $(pwd)"
 log "Git status before sync:"
 git status >> "$LOGFILE" 2>&1
 
+# Check Git config for user identity
+log "Checking Git user identity."
+USER_NAME=$(git config --get user.name)
+USER_EMAIL=$(git config --get user.email)
+if [ -z "$USER_NAME" ] || [ -z "$USER_EMAIL" ]; then
+    log "Error: Git user identity not configured. Run 'git config --global user.name \"Your Name\"' and 'git config --global user.email \"you@example.com\"' to set it."
+    exit 1
+fi
+log "Git user name: $USER_NAME"
+log "Git user email: $USER_EMAIL"
+
 # Get main branch
 log "Determining main branch."
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
@@ -142,22 +167,27 @@ log "Checking for local changes before pull (RW mode)."
 MODIFIED=$(git diff --name-only | wc -l)
 log "Modified tracked files count: $MODIFIED"
 if [ "$MODIFIED" -gt 0 ]; then
-    log "Modified tracked files:"
-    git diff --name-only >> "$LOGFILE" 2>&1
+    MODIFIED_FILES=$(git diff --name-only)
+    log_file_list "Modified tracked files:" "$MODIFIED_FILES"
 fi
 STAGED=$(git diff --staged --name-only | wc -l)
 log "Staged files count: $STAGED"
 if [ "$STAGED" -gt 0 ]; then
-    log "Staged files:"
-    git diff --staged --name-only >> "$LOGFILE" 2>&1
+    STAGED_FILES=$(git diff --staged --name-only)
+    log_file_list "Staged files:" "$STAGED_FILES"
 fi
 UNTRACKED=$(git ls-files --others --exclude-standard | wc -l)
 log "Untracked, unignored files count: $UNTRACKED"
 if [ "$UNTRACKED" -gt 0 ]; then
-    log "Untracked, unignored files:"
-    git ls-files --others --exclude-standard >> "$LOGFILE" 2>&1
+    UNTRACKED_FILES=$(git ls-files --others --exclude-standard)
+    log_file_list "Untracked, unignored files:" "$UNTRACKED_FILES"
 fi
-TOTAL_CHANGES=$((MODIFIED + STAGED + UNTRACKED))
+# Correct total changes to avoid double-counting
+if [ "$MODIFIED" -gt 0 ] || [ "$STAGED" -gt 0 ] || [ "$UNTRACKED" -gt 0 ]; then
+    TOTAL_CHANGES=1
+else
+    TOTAL_CHANGES=0
+fi
 log "Total changes detected before pull: $TOTAL_CHANGES"
 
 # Stash changes early if they exist (for RW mode)
@@ -207,8 +237,7 @@ log "Commit hash after pull: $AFTER_PULL"
 if [ "$BEFORE_PULL" != "$AFTER_PULL" ]; then
     PULLED=$(git diff --name-only "$BEFORE_PULL" "$AFTER_PULL" | wc -l)
     log "Files pulled: $PULLED"
-    log "Changed files from pull:"
-    git diff --name-only "$BEFORE_PULL" "$AFTER_PULL" >> "$LOGFILE" 2>&1
+    log_file_list "Changed files from pull:" "$(git diff --name-only "$BEFORE_PULL" "$AFTER_PULL")"
 else
     log "No changes pulled from remote."
 fi
@@ -226,22 +255,24 @@ if [ "$ACCESS" = "RW" ] && [ "$STASHED" = true ]; then
     MODIFIED=$(git diff --name-only | wc -l)
     log "Modified tracked files count after stash: $MODIFIED"
     if [ "$MODIFIED" -gt 0 ]; then
-        log "Modified tracked files after stash:"
-        git diff --name-only >> "$LOGFILE" 2>&1
+        log_file_list "Modified tracked files after stash:" "$(git diff --name-only)"
     fi
     STAGED=$(git diff --staged --name-only | wc -l)
     log "Staged files count after stash: $STAGED"
     if [ "$STAGED" -gt 0 ]; then
-        log "Staged files after stash:"
-        git diff --staged --name-only >> "$LOGFILE" 2>&1
+        log_file_list "Staged files after stash:" "$(git diff --staged --name-only)"
     fi
     UNTRACKED=$(git ls-files --others --exclude-standard | wc -l)
     log "Untracked, unignored files count after stash: $UNTRACKED"
     if [ "$UNTRACKED" -gt 0 ]; then
-        log "Untracked, unignored files after stash:"
-        git ls-files --others --exclude-standard >> "$LOGFILE" 2>&1
+        log_file_list "Untracked, unignored files after stash:" "$(git ls-files --others --exclude-standard)"
     fi
-    TOTAL_CHANGES=$((MODIFIED + STAGED + UNTRACKED))
+    # Correct total changes
+    if [ "$MODIFIED" -gt 0 ] || [ "$STAGED" -gt 0 ] || [ "$UNTRACKED" -gt 0 ]; then
+        TOTAL_CHANGES=1
+    else
+        TOTAL_CHANGES=0
+    fi
     log "Total changes detected after stash: $TOTAL_CHANGES"
     
     if [ "$TOTAL_CHANGES" -gt 0 ]; then
@@ -268,8 +299,7 @@ if [ "$ACCESS" = "RW" ] && [ "$STASHED" = true ]; then
         if [ "$BEFORE_PUSH" != "$AFTER_PUSH" ]; then
             PUSHED=$(git diff --name-only "$BEFORE_PUSH" "$AFTER_PUSH" | wc -l)
             log "Files pushed: $PUSHED"
-            log "Changed files for push:"
-            git diff --name-only "$BEFORE_PUSH" "$AFTER_PUSH" >> "$LOGFILE" 2>&1
+            log_file_list "Changed files for push:" "$(git diff --name-only "$BEFORE_PUSH" "$AFTER_PUSH")"
         fi
         # Push to remote
         log "Pushing to $REPO."
