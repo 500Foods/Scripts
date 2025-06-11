@@ -18,6 +18,19 @@ These scripts help with date and time operations:
 - [Uptime Fancy](https://github.com/500Foods/Scripts/blob/main/dates/uptime-fancy.md) - Show system uptime with week number in a compact format (BASH)
 - [Week Number](https://github.com/500Foods/Scripts/blob/main/dates/weeknumber.md) - Calculate ISO week numbers with formatted date output (Python)
 
+## Tables
+
+These scripts help format and display data in terminal-friendly tables:
+
+- [Tables](https://github.com/500Foods/Scripts/blob/main/tables/tables.md) - Render JSON data as customizable ASCII tables with themes, data formatting, and totals (BASH)
+
+## Kubernetes
+
+These scripts help manage and monitor Kubernetes clusters:
+
+- [Node Info](https://github.com/500Foods/Scripts/blob/main/kubernetes/nodeinfo.md) - Display detailed information about nodes and pods in a Kubernetes cluster (BASH)
+- [Domain Management](https://github.com/500Foods/Scripts/blob/main/kubernetes/dommgmt.md) - Audit ingress controllers and certificate manager configurations to identify mismatches (BASH)
+
 ## GitHub
 
 These tools help manage GitHub repositories:
