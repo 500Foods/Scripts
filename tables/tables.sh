@@ -22,7 +22,7 @@ declare -g DEFAULT_PADDING=1
 # Each theme defines colors and ASCII characters for table borders
 declare -A RED_THEME=(
     [border_color]='\033[0;31m' # Red border color
-    [header_color]='\033[0;31m' # Red header color
+    [header_color]='\033[0;32m' # Green header color
     [text_color]='\033[0m'      # Default text color (terminal default)
     [tl_corner]='╭'             # Top-left corner
     [tr_corner]='╮'             # Top-right corner
@@ -674,7 +674,7 @@ render_table_headers() {
             right)
                 # Total available width minus padding on both sides
                 local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                printf "%*s%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[header_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "${content_width}" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
             center)
@@ -682,11 +682,11 @@ render_table_headers() {
                 local header_spaces=$(( (content_width - ${#HEADERS[$i]}) / 2 ))
                 local left_spaces=$(( PADDINGS[$i] + header_spaces ))
                 local right_spaces=$(( PADDINGS[$i] + content_width - ${#HEADERS[$i]} - header_spaces ))
-                printf "%*s%s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${left_spaces}" "" "${HEADERS[$i]}" "${right_spaces}" ""
                 ;;
             *)
-                printf "%*s%-*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[header_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
         esac

@@ -1,0 +1,58 @@
+{
+  "theme": "Red",
+  "sort": [
+    {"key": "namespace", "direction": "asc", "priority": 1},
+    {"key": "pod", "direction": "asc", "priority": 2}
+  ],
+  "columns": [
+    {
+      "header": "POD",
+      "key": "pod",
+      "justification": "left",
+      "datatype": "text",
+      "null_value": "blank",
+      "zero_value": "blank",
+      "total": "count"
+    },
+    {
+      "header": "NAMESPACE",
+      "key": "namespace",
+      "justification": "center",
+      "datatype": "text",
+      "null_value": "blank",
+      "zero_value": "blank",
+      "total": "count",
+      "break": true
+    },
+    {
+      "header": "CPU USE",
+      "key": "cpu_use",
+      "justification": "right",
+      "datatype": "kcpu",
+      "null_value": "blank",
+      "zero_value": "blank",
+      "total": "sum"
+    },
+    {
+      "header": "MEM USE",
+      "key": "mem_use",
+      "justification": "right",
+      "datatype": "kmem",
+      "null_value": "blank",
+      "zero_value": "blank",
+      "total": "sum"
+    },
+    {
+      "header": "PORTS",
+      "key": "ports",
+      "justification": "left",
+      "datatype": "text",
+      "null_value": "blank",
+      "zero_value": "blank",
+      "total": "none",
+      "string_limit": 20,
+      "wrap_mode": "wrap",
+      "wrap_char": ";"
+    }
+  ]
+}

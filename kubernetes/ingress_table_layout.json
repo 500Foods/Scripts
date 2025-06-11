@@ -1,0 +1,53 @@
+{
+  "theme": "Red",
+  "columns": [
+    {
+      "header": "DOMAIN",
+      "key": "domain",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "NAMESPACE",
+      "key": "namespace",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "WORKLOAD",
+      "key": "workload",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "WORKTYPE",
+      "key": "worktype",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "INGRESS",
+      "key": "ingress",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "SERVICE:PORT",
+      "key": "service_port",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "PATH",
+      "key": "path",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "TLS",
+      "key": "tls",
+      "datatype": "text",
+      "justification": "left"
+    }
+  ]
+}

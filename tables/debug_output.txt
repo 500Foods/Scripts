@@ -1,0 +1,306 @@
+[DEBUG] Starting table rendering with debug=true
+[DEBUG] Layout file: layout.json
+[DEBUG] Data file: data.json
+[DEBUG] Validating input files: layout.json, data.json
+[DEBUG] Parsing layout file: layout.json
+[DEBUG] Theme: Red
+[DEBUG] Columns JSON: [{"header":"POD","key":"pod","justification":"left","datatype":"text","null_value":"blank","zero_value":"blank","total":"count"},{"header":"NAMESPACE","key":"namespace","justification":"center","datatype":"text","null_value":"blank","zero_value":"blank","total":"count","break":true},{"header":"CPU USE","key":"cpu_use","justification":"right","datatype":"kcpu","null_value":"blank","zero_value":"blank","total":"sum"},{"header":"MEM USE","key":"mem_use","justification":"right","datatype":"kmem","null_value":"blank","zero_value":"blank","total":"sum"},{"header":"PORTS","key":"ports","justification":"left","datatype":"text","null_value":"blank","zero_value":"blank","total":"none","string_limit":20,"wrap_mode":"wrap","wrap_char":";"}]
+[DEBUG] Sort JSON: [{"key":"namespace","direction":"asc","priority":1},{"key":"pod","direction":"asc","priority":2}]
+[DEBUG] Parsing column configuration
+[DEBUG] Column count: 5
+[DEBUG] Column 0: Header=POD, Key=pod, Datatype=text
+[DEBUG] Column 1: Header=NAMESPACE, Key=namespace, Datatype=text
+[DEBUG] Column 2: Header=CPU USE, Key=cpu_use, Datatype=kcpu
+[DEBUG] Column 3: Header=MEM USE, Key=mem_use, Datatype=kmem
+[DEBUG] Column 4: Header=PORTS, Key=ports, Datatype=text
+[DEBUG] Initial width for column 0 (POD): 5 (including padding 1)
+[DEBUG] Initial width for column 1 (NAMESPACE): 11 (including padding 1)
+[DEBUG] Initial width for column 2 (CPU USE): 9 (including padding 1)
+[DEBUG] Initial width for column 3 (MEM USE): 9 (including padding 1)
+[DEBUG] Initial width for column 4 (PORTS): 7 (including padding 1)
+[DEBUG] After parse_column_config - Number of columns: 5
+[DEBUG] After parse_column_config - Headers: POD NAMESPACE CPU USE MEM USE PORTS
+[DEBUG] After parse_column_config - Keys: pod namespace cpu_use mem_use ports
+[DEBUG] Parsing sort configuration
+[DEBUG] Sort count: 2
+[DEBUG] Sort 0: Key=namespace, Direction=asc
+[DEBUG] Sort 1: Key=pod, Direction=asc
+[DEBUG] Initializing totals storage
+[DEBUG] Preparing data from file: data.json
+[DEBUG] Data row count: 6
+[DEBUG] Row 0: {"pod":"pod-a","namespace":"ns1","cpu_use":"100m","mem_use":"128M","ports":"8080/TCP;8443/TCP"}
+[DEBUG] Row 1: {"pod":"pod-b","namespace":"ns1","cpu_use":"50m","mem_use":"64M","ports":"80/TCP"}
+[DEBUG] Row 2: {"pod":"pod-c","namespace":"ns2","cpu_use":null,"mem_use":"256M","ports":""}
+[DEBUG] Row 3: {"pod":"pod-d","namespace":"ns2","cpu_use":"200m","mem_use":null,"ports":"9090/TCP;9091/TCP;9092/TCP"}
+[DEBUG] Row 4: {"pod":"pod-e","namespace":"ns3","cpu_use":"0m","mem_use":"0M","ports":null}
+[DEBUG] Row 5: {"pod":"pod-f","namespace":"ns3","cpu_use":"150m","mem_use":"512M","ports":"443/TCP;8443/TCP;9443/TCP"}
+[DEBUG] Valid rows count: 6
+[DEBUG] Sorting data
+[DEBUG] JQ sort expression: .namespace,.pod
+[DEBUG] Data sorted successfully
+[DEBUG] ================ DATA PROCESSING ================
+[DEBUG] Processing 6 rows of data
+[DEBUG] Number of columns: 5
+[DEBUG] Column headers: POD NAMESPACE CPU USE MEM USE PORTS
+[DEBUG] Column keys: pod namespace cpu_use mem_use ports
+[DEBUG] Initial widths: 5 11 9 9 7
+[DEBUG] Processing row 0: {"pod":"pod-a","namespace":"ns1","cpu_use":"100m","mem_use":"128M","ports":"8080/TCP;8443/TCP"}
+[DEBUG] Column 0 (POD): Raw value='pod-a', Formatted value='pod-a'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns1', Formatted value='ns1'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='100m', Formatted value='100m'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='128M', Formatted value='128M'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='8080/TCP;8443/TCP', Formatted value='8080/TCP;8443/TCP'
+[DEBUG] Wrapped value: parts=2, max_len=8, new width=10
+[DEBUG] Processing row 1: {"pod":"pod-b","namespace":"ns1","cpu_use":"50m","mem_use":"64M","ports":"80/TCP"}
+[DEBUG] Column 0 (POD): Raw value='pod-b', Formatted value='pod-b'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns1', Formatted value='ns1'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='50m', Formatted value='50m'
+[DEBUG] Plain value: len=3, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='64M', Formatted value='64M'
+[DEBUG] Plain value: len=3, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='80/TCP', Formatted value='80/TCP'
+[DEBUG] Wrapped value: parts=1, max_len=6, new width=10
+[DEBUG] Processing row 2: {"pod":"pod-c","namespace":"ns2","cpu_use":null,"mem_use":"256M","ports":""}
+[DEBUG] Column 0 (POD): Raw value='pod-c', Formatted value='pod-c'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns2', Formatted value='ns2'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='null', Formatted value=''
+[DEBUG] Null value handling: 'null' -> ''
+[DEBUG] Plain value: len=0, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='256M', Formatted value='256M'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='', Formatted value=''
+[DEBUG] Plain value: len=0, new width=10
+[DEBUG] Processing row 3: {"pod":"pod-d","namespace":"ns2","cpu_use":"200m","mem_use":null,"ports":"9090/TCP;9091/TCP;9092/TCP"}
+[DEBUG] Column 0 (POD): Raw value='pod-d', Formatted value='pod-d'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns2', Formatted value='ns2'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='200m', Formatted value='200m'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='null', Formatted value=''
+[DEBUG] Null value handling: 'null' -> ''
+[DEBUG] Plain value: len=0, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='9090/TCP;9091/TCP;9092/TCP', Formatted value='9090/TCP
+9091/TCP
+9092/TCP'
+[DEBUG] Wrapped value: parts=1, max_len=8, new width=10
+[DEBUG] Processing row 4: {"pod":"pod-e","namespace":"ns3","cpu_use":"0m","mem_use":"0M","ports":null}
+[DEBUG] Column 0 (POD): Raw value='pod-e', Formatted value='pod-e'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns3', Formatted value='ns3'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='0m', Formatted value=''
+[DEBUG] Zero value handling: '0m' -> ''
+[DEBUG] Plain value: len=0, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='0M', Formatted value=''
+[DEBUG] Zero value handling: '0M' -> ''
+[DEBUG] Plain value: len=0, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='', Formatted value=''
+[DEBUG] Plain value: len=0, new width=10
+[DEBUG] Processing row 5: {"pod":"pod-f","namespace":"ns3","cpu_use":"150m","mem_use":"512M","ports":"443/TCP;8443/TCP;9443/TCP"}
+[DEBUG] Column 0 (POD): Raw value='pod-f', Formatted value='pod-f'
+[DEBUG] Plain value: len=5, new width=7
+[DEBUG] Column 1 (NAMESPACE): Raw value='ns3', Formatted value='ns3'
+[DEBUG] Plain value: len=3, new width=11
+[DEBUG] Column 2 (CPU USE): Raw value='150m', Formatted value='150m'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 3 (MEM USE): Raw value='512M', Formatted value='512M'
+[DEBUG] Plain value: len=4, new width=9
+[DEBUG] Column 4 (PORTS): Raw value='443/TCP;8443/TCP;9443/TCP', Formatted value='443/TCP
+8443/TCP
+9443/TCP'
+[DEBUG] Wrapped value: parts=1, max_len=7, new width=10
+[DEBUG] Final column widths: 7;11;9;9;10
+[DEBUG] Max lines per row: 2
+[DEBUG] Total rows to render: 6
+[DEBUG] ================ RENDERING TABLE ================
+[DEBUG] Final column widths: 7 11 9 9 10
+[DEBUG] Max lines per row: 2
+[DEBUG] Total rows to render: 6
+[DEBUG] Rendering top border
+[DEBUG] Rendering table headers
+[DEBUG] Rendering header 0: POD, width=7, justification=left
+[DEBUG] Rendering header 1: NAMESPACE, width=11, justification=center
+[DEBUG] Rendering header 2: CPU USE, width=9, justification=right
+[DEBUG] Rendering header 3: MEM USE, width=9, justification=right
+[DEBUG] Rendering header 4: PORTS, width=10, justification=left
+[DEBUG] Rendering table separator: middle
+[DEBUG] ================ RENDERING DATA ROWS ================
+[DEBUG] Rendering 6 rows with max_lines=2
+[DEBUG] Number of columns when rendering: 5
+[DEBUG] Column headers when rendering: POD NAMESPACE CPU USE MEM USE PORTS
+[DEBUG] Rendering row 0: {"pod":"pod-a","namespace":"ns1","cpu_use":"100m","mem_use":"128M","ports":"8080/TCP;8443/TCP"}
+[DEBUG] Row 0, Column 0 (POD): Raw value='pod-a'
+[DEBUG] Row 0, Column 0 (POD): Display value='pod-a'
+[DEBUG] Row 0, Column 0, Line 0: 'pod-a'
+[DEBUG] Row 0, Column 1 (NAMESPACE): Raw value='ns1'
+[DEBUG] Row 0, Column 1 (NAMESPACE): Display value='ns1'
+[DEBUG] Row 0, Column 1, Line 0: 'ns1'
+[DEBUG] Row 0, Column 2 (CPU USE): Raw value='100m'
+[DEBUG] Row 0, Column 2 (CPU USE): Display value='100m'
+[DEBUG] Row 0, Column 2, Line 0: '100m'
+[DEBUG] Row 0, Column 3 (MEM USE): Raw value='128M'
+[DEBUG] Row 0, Column 3 (MEM USE): Display value='128M'
+[DEBUG] Row 0, Column 3, Line 0: '128M'
+[DEBUG] Row 0, Column 4 (PORTS): Raw value='8080/TCP;8443/TCP'
+[DEBUG] Row 0, Column 4 (PORTS): Display value='8080/TCP;8443/TCP'
+[DEBUG] Wrapping value into 2 parts
+[DEBUG] Row 0, Column 4, Line 0: '8080/TCP'
+[DEBUG] Row 0, Column 4, Line 1: '8443/TCP'
+[DEBUG] Row 0 needs 2 lines
+[DEBUG] Rendering row 0, line 0
+[DEBUG] Cell value for row 0, column 0, line 0: 'pod-a'
+[DEBUG] Cell value for row 0, column 1, line 0: 'ns1'
+[DEBUG] Cell value for row 0, column 2, line 0: '100m'
+[DEBUG] Cell value for row 0, column 3, line 0: '128M'
+[DEBUG] Cell value for row 0, column 4, line 0: '8080/TCP'
+[DEBUG] Rendering row 0, line 1
+[DEBUG] Cell value for row 0, column 0, line 1: ''
+[DEBUG] Cell value for row 0, column 1, line 1: ''
+[DEBUG] Cell value for row 0, column 2, line 1: ''
+[DEBUG] Cell value for row 0, column 3, line 1: ''
+[DEBUG] Cell value for row 0, column 4, line 1: '8443/TCP'
+[DEBUG] Rendering row 1: {"pod":"pod-b","namespace":"ns1","cpu_use":"50m","mem_use":"64M","ports":"80/TCP"}
+[DEBUG] Row 1, Column 0 (POD): Raw value='pod-b'
+[DEBUG] Row 1, Column 0 (POD): Display value='pod-b'
+[DEBUG] Row 1, Column 0, Line 0: 'pod-b'
+[DEBUG] Row 1, Column 1 (NAMESPACE): Raw value='ns1'
+[DEBUG] Row 1, Column 1 (NAMESPACE): Display value='ns1'
+[DEBUG] Row 1, Column 1, Line 0: 'ns1'
+[DEBUG] Row 1, Column 2 (CPU USE): Raw value='50m'
+[DEBUG] Row 1, Column 2 (CPU USE): Display value='50m'
+[DEBUG] Row 1, Column 2, Line 0: '50m'
+[DEBUG] Row 1, Column 3 (MEM USE): Raw value='64M'
+[DEBUG] Row 1, Column 3 (MEM USE): Display value='64M'
+[DEBUG] Row 1, Column 3, Line 0: '64M'
+[DEBUG] Row 1, Column 4 (PORTS): Raw value='80/TCP'
+[DEBUG] Row 1, Column 4 (PORTS): Display value='80/TCP'
+[DEBUG] Wrapping value into 1 parts
+[DEBUG] Row 1, Column 4, Line 0: '80/TCP'
+[DEBUG] Row 1 needs 1 lines
+[DEBUG] Rendering row 1, line 0
+[DEBUG] Cell value for row 1, column 0, line 0: 'pod-b'
+[DEBUG] Cell value for row 1, column 1, line 0: 'ns1'
+[DEBUG] Cell value for row 1, column 2, line 0: '50m'
+[DEBUG] Cell value for row 1, column 3, line 0: '64M'
+[DEBUG] Cell value for row 1, column 4, line 0: '80/TCP'
+[DEBUG] Rendering row 2: {"pod":"pod-c","namespace":"ns2","cpu_use":null,"mem_use":"256M","ports":""}
+[DEBUG] Break detected for column 1: 'ns1' -> 'ns2'
+[DEBUG] Rendering table separator: middle
+[DEBUG] Row 2, Column 0 (POD): Raw value='pod-c'
+[DEBUG] Row 2, Column 0 (POD): Display value='pod-c'
+[DEBUG] Row 2, Column 0, Line 0: 'pod-c'
+[DEBUG] Row 2, Column 1 (NAMESPACE): Raw value='ns2'
+[DEBUG] Row 2, Column 1 (NAMESPACE): Display value='ns2'
+[DEBUG] Row 2, Column 1, Line 0: 'ns2'
+[DEBUG] Row 2, Column 2 (CPU USE): Raw value='null'
+[DEBUG] Row 2, Column 2 (CPU USE): Display value=''
+[DEBUG] Row 2, Column 2, Line 0: ''
+[DEBUG] Row 2, Column 3 (MEM USE): Raw value='256M'
+[DEBUG] Row 2, Column 3 (MEM USE): Display value='256M'
+[DEBUG] Row 2, Column 3, Line 0: '256M'
+[DEBUG] Row 2, Column 4 (PORTS): Raw value=''
+[DEBUG] Row 2, Column 4 (PORTS): Display value=''
+[DEBUG] Row 2, Column 4, Line 0: ''
+[DEBUG] Row 2 needs 1 lines
+[DEBUG] Rendering row 2, line 0
+[DEBUG] Cell value for row 2, column 0, line 0: 'pod-c'
+[DEBUG] Cell value for row 2, column 1, line 0: 'ns2'
+[DEBUG] Cell value for row 2, column 2, line 0: ''
+[DEBUG] Cell value for row 2, column 3, line 0: '256M'
+[DEBUG] Cell value for row 2, column 4, line 0: ''
+[DEBUG] Rendering row 3: {"pod":"pod-d","namespace":"ns2","cpu_use":"200m","mem_use":null,"ports":"9090/TCP;9091/TCP;9092/TCP"}
+[DEBUG] Row 3, Column 0 (POD): Raw value='pod-d'
+[DEBUG] Row 3, Column 0 (POD): Display value='pod-d'
+[DEBUG] Row 3, Column 0, Line 0: 'pod-d'
+[DEBUG] Row 3, Column 1 (NAMESPACE): Raw value='ns2'
+[DEBUG] Row 3, Column 1 (NAMESPACE): Display value='ns2'
+[DEBUG] Row 3, Column 1, Line 0: 'ns2'
+[DEBUG] Row 3, Column 2 (CPU USE): Raw value='200m'
+[DEBUG] Row 3, Column 2 (CPU USE): Display value='200m'
+[DEBUG] Row 3, Column 2, Line 0: '200m'
+[DEBUG] Row 3, Column 3 (MEM USE): Raw value='null'
+[DEBUG] Row 3, Column 3 (MEM USE): Display value=''
+[DEBUG] Row 3, Column 3, Line 0: ''
+[DEBUG] Row 3, Column 4 (PORTS): Raw value='9090/TCP;9091/TCP;9092/TCP'
+[DEBUG] Row 3, Column 4 (PORTS): Display value='9090/TCP
+9091/TCP
+9092/TCP'
+[DEBUG] Wrapping value into 1 parts
+[DEBUG] Row 3, Column 4, Line 0: '9090/TCP'
+[DEBUG] Row 3 needs 1 lines
+[DEBUG] Rendering row 3, line 0
+[DEBUG] Cell value for row 3, column 0, line 0: 'pod-d'
+[DEBUG] Cell value for row 3, column 1, line 0: 'ns2'
+[DEBUG] Cell value for row 3, column 2, line 0: '200m'
+[DEBUG] Cell value for row 3, column 3, line 0: ''
+[DEBUG] Cell value for row 3, column 4, line 0: '9090/TCP'
+[DEBUG] Rendering row 4: {"pod":"pod-e","namespace":"ns3","cpu_use":"0m","mem_use":"0M","ports":null}
+[DEBUG] Break detected for column 1: 'ns2' -> 'ns3'
+[DEBUG] Rendering table separator: middle
+[DEBUG] Row 4, Column 0 (POD): Raw value='pod-e'
+[DEBUG] Row 4, Column 0 (POD): Display value='pod-e'
+[DEBUG] Row 4, Column 0, Line 0: 'pod-e'
+[DEBUG] Row 4, Column 1 (NAMESPACE): Raw value='ns3'
+[DEBUG] Row 4, Column 1 (NAMESPACE): Display value='ns3'
+[DEBUG] Row 4, Column 1, Line 0: 'ns3'
+[DEBUG] Row 4, Column 2 (CPU USE): Raw value='0m'
+[DEBUG] Row 4, Column 2 (CPU USE): Display value=''
+[DEBUG] Row 4, Column 2, Line 0: ''
+[DEBUG] Row 4, Column 3 (MEM USE): Raw value='0M'
+[DEBUG] Row 4, Column 3 (MEM USE): Display value=''
+[DEBUG] Row 4, Column 3, Line 0: ''
+[DEBUG] Row 4, Column 4 (PORTS): Raw value='null'
+[DEBUG] Row 4, Column 4 (PORTS): Display value=''
+[DEBUG] Row 4, Column 4, Line 0: ''
+[DEBUG] Row 4 needs 1 lines
+[DEBUG] Rendering row 4, line 0
+[DEBUG] Cell value for row 4, column 0, line 0: 'pod-e'
+[DEBUG] Cell value for row 4, column 1, line 0: 'ns3'
+[DEBUG] Cell value for row 4, column 2, line 0: ''
+[DEBUG] Cell value for row 4, column 3, line 0: ''
+[DEBUG] Cell value for row 4, column 4, line 0: ''
+[DEBUG] Rendering row 5: {"pod":"pod-f","namespace":"ns3","cpu_use":"150m","mem_use":"512M","ports":"443/TCP;8443/TCP;9443/TCP"}
+[DEBUG] Row 5, Column 0 (POD): Raw value='pod-f'
+[DEBUG] Row 5, Column 0 (POD): Display value='pod-f'
+[DEBUG] Row 5, Column 0, Line 0: 'pod-f'
+[DEBUG] Row 5, Column 1 (NAMESPACE): Raw value='ns3'
+[DEBUG] Row 5, Column 1 (NAMESPACE): Display value='ns3'
+[DEBUG] Row 5, Column 1, Line 0: 'ns3'
+[DEBUG] Row 5, Column 2 (CPU USE): Raw value='150m'
+[DEBUG] Row 5, Column 2 (CPU USE): Display value='150m'
+[DEBUG] Row 5, Column 2, Line 0: '150m'
+[DEBUG] Row 5, Column 3 (MEM USE): Raw value='512M'
+[DEBUG] Row 5, Column 3 (MEM USE): Display value='512M'
+[DEBUG] Row 5, Column 3, Line 0: '512M'
+[DEBUG] Row 5, Column 4 (PORTS): Raw value='443/TCP;8443/TCP;9443/TCP'
+[DEBUG] Row 5, Column 4 (PORTS): Display value='443/TCP
+8443/TCP
+9443/TCP'
+[DEBUG] Wrapping value into 1 parts
+[DEBUG] Row 5, Column 4, Line 0: '443/TCP'
+[DEBUG] Row 5 needs 1 lines
+[DEBUG] Rendering row 5, line 0
+[DEBUG] Cell value for row 5, column 0, line 0: 'pod-f'
+[DEBUG] Cell value for row 5, column 1, line 0: 'ns3'
+[DEBUG] Cell value for row 5, column 2, line 0: '150m'
+[DEBUG] Cell value for row 5, column 3, line 0: '512M'
+[DEBUG] Cell value for row 5, column 4, line 0: '443/TCP'
+[DEBUG] Checking if totals row should be rendered
+[DEBUG] Rendering totals row
+[DEBUG] Rendering table separator: middle
+[DEBUG] Total for column 0 (POD, count): 6
+[DEBUG] Total for column 1 (NAMESPACE, count): 6
+[DEBUG] Total for column 2 (CPU USE, sum): 500m
+[DEBUG] Total for column 3 (MEM USE, sum): 960M
+[DEBUG] Total for column 4 (PORTS, none): 
+[DEBUG] Rendering table separator: bottom
+[DEBUG] Table rendering complete
