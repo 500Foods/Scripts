@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# domain_info.sh - DOKS Ingress and Certificate Manager Audit Tool
+# domain_info.sh - DOKS Domain Information Tool
 # Version: 1.0.0
 #
 # Version History:
 # 1.0.0 - Initial version with tables.sh integration
-#
-# This script replaces dommgmt.sh with a cleaner implementation that uses tables.sh
-# for table rendering.
 #
 # Usage: ./domain_info.sh [--debug]
 
@@ -20,6 +17,7 @@ DEBUG="false"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TABLES_SCRIPT="${SCRIPT_DIR}/../tables/tables.sh"
 TEMP_DIR=$(mktemp -d)
+TABLE_THEME="Red"
 
 # Parse arguments
 while [ $# -gt 0 ]; do
@@ -84,14 +82,14 @@ render_table() {
 }
 
 # Print script header
-echo "=== DOKS Ingress and Certificate Manager Audit (v$VERSION) ==="
+echo "=== DOKS Domain Information Tool (v$VERSION) ==="
 echo "Ingress Class: $INGRESS_CLASS"
 echo "Cert-Manager Namespace: $CERT_MANAGER_NAMESPACE"
 echo "Ingress Namespace: $INGRESS_NAMESPACE"
 
 # Function to get ingress domains and their backends
 get_ingress_domains() {
-    echo "=== Ingress Controller Domains ==="
+    echo -e "\n=== Ingress Controller Domains ==="
     
     # Create temporary files
     local ingress_temp="${TEMP_DIR}/ingress_temp.json"
@@ -149,10 +147,10 @@ get_ingress_domains() {
     # Store service info for workloads section
     jq -r '"\(.namespace)\t\(.service)"' "$domains_temp" | sort -u > "${TEMP_DIR}/service_info.txt"
     
-    # Create table layout JSON
+  # Create table layout JSON
     local layout=$(cat <<EOF
 {
-  "theme": "Blue",
+  "theme": "$TABLE_THEME",
   "columns": [
     {
       "header": "DOMAIN",
@@ -235,7 +233,7 @@ EOF
     render_table "Ingress Controller Domains" "$layout_file" "$data_file"
     
     # Save ingress domains for mismatch check
-    jq -r 'select(.domain != "(default)") | .domain' "$data_file" | sort -u > "${TEMP_DIR}/ingress_domains.txt"
+    jq -r '.[] | select(.domain != "(default)") | .domain' "$data_file" | sort -u > "${TEMP_DIR}/ingress_domains.txt"
     
     return 0
 }
@@ -315,10 +313,10 @@ get_application_workloads() {
     # Merge all JSON files
     jq -s 'add' "$data_file" > "${TEMP_DIR}/workloads_data_merged.json"
     
-    # Create table layout JSON
+  # Create table layout JSON
     local layout=$(cat <<EOF
 {
-  "theme": "Blue",
+  "theme": "$TABLE_THEME",
   "columns": [
     {
       "header": "SERVICE",
@@ -401,64 +399,51 @@ get_cert_manager_status() {
     debug "Cert temp file: $cert_temp"
     debug "Display temp file: $display_temp"
     
-    # Get certificates
-    kubectl get certificates -A -o json > "$cert_temp"
+    # Initialize with empty array
+    echo "[]" > "${TEMP_DIR}/cert_display_final.json"
     
-    # Create a simple JSON array for certificates
-    echo "[]" > "$display_temp"
-
-    # Process certificates
-    kubectl get certificates -A -o json | jq -r '.items[] | 
-        .metadata.namespace as $namespace | 
-        .metadata.name as $name | 
-        (.spec.dnsNames // [])[] as $domain | 
-        $domain + "\t" + $namespace + "\t" + $name
-    ' 2>/dev/null | while read -r line; do
-        if [ -n "$line" ]; then
-            IFS=$'\t' read -r domain namespace cert_name <<< "$line"
-            # Get cert status if possible
-            status=$(kubectl get certificate -n "$namespace" "$cert_name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
-            renewal=$(kubectl get certificate -n "$namespace" "$cert_name" -o jsonpath='{.status.notAfter}' 2>/dev/null || echo "Unknown")
-            
-            # Calculate days left
-            days_left="0"
-            if [ "$renewal" != "Unknown" ]; then
-                renewal_sec=$(date -d "$renewal" +%s 2>/dev/null || echo "0")
-                now_sec=$(date +%s)
-                days_left=$(( (renewal_sec - now_sec) / 86400 ))
-            fi
-            
-            # Add to our display array
-            jq -n --arg domain "$domain" \
-                --arg namespace "$namespace" \
-                --arg cert "$cert_name" \
-                --arg status "$status" \
-                --arg renewal "$renewal" \
-                --arg days "$days_left" \
-                '{
-                    "domain": $domain,
-                    "namespace": $namespace,
-                    "workload": "Missing",
-                    "worktype": "Missing",
-                    "certificate": $cert,
-                    "status": $status,
-                    "renewal": $renewal,
-                    "days_left": $days
-                }' | jq -s '. + input' "$display_temp" > "${display_temp}.new"
-            
-            mv "${display_temp}.new" "$display_temp"
+    # Get all certificates in JSON format
+    local certs_json=$(kubectl get certificates -A -o json 2>/dev/null)
+    
+    if [ -z "$certs_json" ] || [ "$(echo "$certs_json" | jq -r '.items | length')" -eq 0 ]; then
+        # No certificates found
+        echo '[{"domain":"No Certificates","namespace":"N/A","workload":"Missing","worktype":"Missing","certificate":"N/A","status":"Unknown","status_text":"Unknown","renewal":"N/A","days_left":"0"}]' > "${TEMP_DIR}/cert_display_final.json"
+    else
+        # Process each certificate using jq
+        echo "$certs_json" | jq -r '.items[] | .metadata.namespace as $namespace | .metadata.name as $name | 
+            (.spec.dnsNames // []) as $dns_names |
+            (.status.conditions[] | select(.type=="Ready") | .status) as $status |
+            (.status.notAfter // "Unknown") as $renewal |
+            (if $renewal != "Unknown" then
+                ((($renewal | fromdateiso8601) - now) / 86400 | floor)
+            else
+                0
+            end) as $days_left |
+            $dns_names[] | . as $domain |
+            {
+                "domain": $domain,
+                "namespace": $namespace,
+                "workload": "Missing",
+                "worktype": "Missing",
+                "certificate": $name,
+                "status": $status,
+                "status_text": $status,
+                "renewal": $renewal,
+                "days_left": ($days_left | tostring)
+            }' | jq -s '.' > "${TEMP_DIR}/cert_display_final.json"
+        
+        # If no entries were found, use default
+        if [ ! -s "${TEMP_DIR}/cert_display_final.json" ] || [ "$(cat "${TEMP_DIR}/cert_display_final.json")" = "[]" ]; then
+            echo '[{"domain":"No Certificates","namespace":"N/A","workload":"Missing","worktype":"Missing","certificate":"N/A","status":"Unknown","status_text":"Unknown","renewal":"N/A","days_left":"0"}]' > "${TEMP_DIR}/cert_display_final.json"
         fi
-    done
-
-    # If no certificates were found, add a default entry
-    if [ ! -s "$display_temp" ] || [ "$(jq '. | length' "$display_temp")" = "0" ]; then
-        echo '[{"domain":"No Certificates","namespace":"N/A","workload":"Missing","worktype":"Missing","certificate":"N/A","status":"Unknown","renewal":"N/A","days_left":"0"}]' > "$display_temp"
     fi
+    
+    debug "Certificate data processed and saved to ${TEMP_DIR}/cert_display_final.json"
     
     # Create table layout JSON
     local layout=$(cat <<EOF
 {
-  "theme": "Blue",
+  "theme": "$TABLE_THEME",
   "columns": [
     {
       "header": "DOMAIN",
@@ -521,12 +506,8 @@ get_cert_manager_status() {
 EOF
 )
     
-    # Create data file with status text conversion
-    jq -r '[.[] | 
-        # Convert status from True/False to Active/Inactive
-        (.status | if . == "True" then "Active" elif . == "False" then "Inactive" else . end) as $status_text |
-        . + {"status_text": $status_text}
-    ]' "$display_temp" > "${TEMP_DIR}/cert_display_final.json"
+    # For display purposes, ensure we don't fail even if JSON processing isn't perfect
+    debug "Processing certificate data for display"
     
     # Create layout file
     local layout_file=$(create_table_layout "certificates" "$layout")
@@ -535,7 +516,11 @@ EOF
     render_table "Certificate Manager Status" "$layout_file" "${TEMP_DIR}/cert_display_final.json"
     
     # Save certificate domains for mismatch check
-    jq -r '.domain' "$display_temp" | sort -u > "${TEMP_DIR}/cert_domains.txt"
+    if [ -s "${TEMP_DIR}/cert_display_final.json" ]; then
+        jq -r '.[] | select(.domain != "No Certificates") | .domain' "${TEMP_DIR}/cert_display_final.json" | sort -u > "${TEMP_DIR}/cert_domains.txt"
+    else
+        echo -n > "${TEMP_DIR}/cert_domains.txt"
+    fi
     
     return 0
 }
@@ -550,75 +535,124 @@ find_domain_mismatches() {
         return 1
     fi
     
-    # Find domains in ingress but not in cert-manager
-    local missing_certs=$(comm -23 <(sort "${TEMP_DIR}/ingress_domains.txt") <(sort "${TEMP_DIR}/cert_domains.txt"))
+    # Check if files exist and create them if they don't
+    if [ ! -f "${TEMP_DIR}/ingress_domains.txt" ]; then
+        touch "${TEMP_DIR}/ingress_domains.txt"
+    fi
     
-    # Find domains in cert-manager but not in ingress
-    local unused_certs=$(comm -13 <(sort "${TEMP_DIR}/ingress_domains.txt") <(sort "${TEMP_DIR}/cert_domains.txt"))
+    if [ ! -f "${TEMP_DIR}/cert_domains.txt" ]; then
+        touch "${TEMP_DIR}/cert_domains.txt"
+    fi
     
-    # Create data JSON
+    # Ensure domain files exist
+    touch "${TEMP_DIR}/ingress_domains.txt" "${TEMP_DIR}/cert_domains.txt"
+    
+    # Process domain comparisons using temporary files to avoid race conditions
+    sort -u "${TEMP_DIR}/ingress_domains.txt" > "${TEMP_DIR}/ingress_sorted.txt"
+    sort -u "${TEMP_DIR}/cert_domains.txt" > "${TEMP_DIR}/cert_sorted.txt"
+    
+    # Find domains missing certificates (in ingress but not in certs)
+    comm -23 "${TEMP_DIR}/ingress_sorted.txt" "${TEMP_DIR}/cert_sorted.txt" > "${TEMP_DIR}/missing_certs.txt"
+    
+    # Find unused certificates (in certs but not in ingress)
+    comm -13 "${TEMP_DIR}/ingress_sorted.txt" "${TEMP_DIR}/cert_sorted.txt" > "${TEMP_DIR}/unused_certs.txt"
+    
+    local missing_certs=""
+    local unused_certs=""
+    
+    # Read the results
+    if [ -s "${TEMP_DIR}/missing_certs.txt" ]; then
+        missing_certs=$(cat "${TEMP_DIR}/missing_certs.txt")
+    fi
+    if [ -s "${TEMP_DIR}/unused_certs.txt" ]; then
+        unused_certs=$(cat "${TEMP_DIR}/unused_certs.txt")
+    fi
+    
+    # Create data JSON - use simpler approach to avoid jq errors
     local display_temp="${TEMP_DIR}/mismatches_data.json"
     
-    if [ -z "$missing_certs" ] && [ -z "$unused_certs" ]; then
-        echo '[{ "domain": "No Issues", "status": "OK", "description": "All domains properly configured" }]' > "$display_temp"
-    else
-        echo "[]" > "$display_temp"
+    # Start with default "No Issues" entry
+    echo '[{ "domain": "No Issues", "status": "OK", "description": "All domains properly configured" }]' > "$display_temp"
+    
+    # Process domain mismatches if any exist
+    if [ -n "$missing_certs" ] || [ -n "$unused_certs" ]; then
+        # Array for collecting entries
+        echo "[]" > "${TEMP_DIR}/mismatch_entries.json"
+        local entry_count=0
+        
+        # Process missing certificates
         if [ -n "$missing_certs" ]; then
-            echo "$missing_certs" | while read -r domain; do
+            while read -r domain; do
                 if [ -n "$domain" ]; then
-                    jq -n --arg domain "$domain" \
-                        '{
-                            "domain": $domain,
-                            "status": "Missing Cert",
-                            "description": "Domain has no TLS certificate"
-                        }' | jq -s '. + input' "$display_temp" > "${display_temp}.new"
-                    
-                    mv "${display_temp}.new" "$display_temp"
+                    entry_count=$((entry_count + 1))
+                    # Create entry JSON directly
+                    echo "{
+                        \"domain\": \"$domain\",
+                        \"status\": \"Missing Cert\",
+                        \"description\": \"Domain has no TLS certificate\"
+                    }" > "${TEMP_DIR}/mismatch_entry_$entry_count.json"
                 fi
-            done
+            done <<< "$missing_certs"
         fi
         
+        # Process unused certificates
         if [ -n "$unused_certs" ]; then
-            echo "$unused_certs" | while read -r domain; do
+            while read -r domain; do
                 if [ -n "$domain" ]; then
-                    jq -n --arg domain "$domain" \
-                        '{
-                            "domain": $domain,
-                            "status": "Unused Cert",
-                            "description": "Certificate not used by any ingress"
-                        }' | jq -s '. + input' "$display_temp" > "${display_temp}.new"
-                    
-                    mv "${display_temp}.new" "$display_temp"
+                    entry_count=$((entry_count + 1))
+                    # Create entry JSON directly
+                    echo "{
+                        \"domain\": \"$domain\",
+                        \"status\": \"Unused Cert\",
+                        \"description\": \"Certificate not used by any ingress\"
+                    }" > "${TEMP_DIR}/mismatch_entry_$entry_count.json"
+                fi
+            done <<< "$unused_certs"
+        fi
+        
+        # If we have entries, combine them
+        if [ $entry_count -gt 0 ]; then
+            echo "[" > "${TEMP_DIR}/mismatch_entries.json"
+            for i in $(seq 1 $entry_count); do
+                cat "${TEMP_DIR}/mismatch_entry_$i.json" >> "${TEMP_DIR}/mismatch_entries.json"
+                if [ $i -lt $entry_count ]; then
+                    echo "," >> "${TEMP_DIR}/mismatch_entries.json"
                 fi
             done
+            echo "]" >> "${TEMP_DIR}/mismatch_entries.json"
+            
+            # Use the entries file if it's valid
+            if [ -s "${TEMP_DIR}/mismatch_entries.json" ] && [ "$(cat "${TEMP_DIR}/mismatch_entries.json")" != "[]" ]; then
+                cp "${TEMP_DIR}/mismatch_entries.json" "$display_temp"
+            fi
         fi
     fi
     
     # Create table layout JSON
     local layout=$(cat <<EOF
 {
-  "theme": "Blue",
+  "theme": "$TABLE_THEME",
   "columns": [
     {
       "header": "DOMAIN",
       "key": "domain",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 9
+      "string_limit": 25
     },
     {
       "header": "STATUS",
       "key": "status",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 6
+      "string_limit": 12
     },
     {
       "header": "DESCRIPTION",
       "key": "description",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 25
+      "string_limit": 35
     }
   ]
 }
@@ -644,49 +678,55 @@ check_system_health() {
     # Start with empty array
     echo "[]" > "$display_temp"
     
-    # Add cert-manager pods
-    kubectl get pods -n "$CERT_MANAGER_NAMESPACE" -o wide | grep -v NAME | while read -r name ready status restarts age ip node nominated_node readiness_gates; do
-        if [ -n "$name" ]; then
-            jq -n --arg namespace "$CERT_MANAGER_NAMESPACE" \
-                --arg pod "$name" \
-                --arg status "$status" \
-                --arg node "$node" \
-                --arg age "$age" \
-                '{
+    # Function to process pods from a namespace and add to the display file
+    process_namespace_pods() {
+        local namespace="$1"
+        local output_file="$2"
+        
+        # Get pods directly in JSON format to avoid text parsing issues
+        kubectl get pods -n "$namespace" -o json > "${TEMP_DIR}/${namespace}_pods.json" 2>/dev/null
+        
+        if [ -s "${TEMP_DIR}/${namespace}_pods.json" ]; then
+            # Process each pod and create a JSON entry
+            jq -r --arg namespace "$namespace" '.items[] | 
+                .metadata.name as $name | 
+                (.status.phase) as $phase | 
+                (.spec.nodeName // "N/A") as $node | 
+                (.metadata.creationTimestamp) as $creationTime | 
+                (now - ($creationTime | fromdateiso8601)) as $age_seconds | 
+                ($age_seconds / 86400 | floor | tostring + " days") as $age | 
+                {
                     "namespace": $namespace,
                     "workload": "Missing",
                     "worktype": "Missing",
                     "node": $node,
-                    "pod": $pod,
-                    "status": $status,
+                    "pod": $name,
+                    "status": $phase,
                     "age": $age
-                }' | jq -s '. + input' "$display_temp" > "${display_temp}.new"
+                }
+            ' "${TEMP_DIR}/${namespace}_pods.json" | jq -s '.' > "${TEMP_DIR}/${namespace}_processed.json"
             
-            mv "${display_temp}.new" "$display_temp"
+            # Merge with the main display file
+            if [ -s "${TEMP_DIR}/${namespace}_processed.json" ]; then
+                if [ ! -s "$output_file" ] || [ "$(cat "$output_file")" = "[]" ]; then
+                    # If display file is empty, just use the processed file
+                    cp "${TEMP_DIR}/${namespace}_processed.json" "$output_file"
+                else
+                    # Otherwise merge the arrays
+                    jq -s 'add' "$output_file" "${TEMP_DIR}/${namespace}_processed.json" > "${output_file}.new" 2>/dev/null
+                    if [ -s "${output_file}.new" ]; then
+                        mv "${output_file}.new" "$output_file"
+                    fi
+                fi
+            fi
         fi
-    done
+    }
     
-    # Add ingress-nginx pods
-    kubectl get pods -n "$INGRESS_NAMESPACE" -o wide | grep -v NAME | while read -r name ready status restarts age ip node nominated_node readiness_gates; do
-        if [ -n "$name" ]; then
-            jq -n --arg namespace "$INGRESS_NAMESPACE" \
-                --arg pod "$name" \
-                --arg status "$status" \
-                --arg node "$node" \
-                --arg age "$age" \
-                '{
-                    "namespace": $namespace,
-                    "workload": "Missing",
-                    "worktype": "Missing",
-                    "node": $node,
-                    "pod": $pod,
-                    "status": $status,
-                    "age": $age
-                }' | jq -s '. + input' "$display_temp" > "${display_temp}.new"
-            
-            mv "${display_temp}.new" "$display_temp"
-        fi
-    done
+    # Process cert-manager pods
+    process_namespace_pods "$CERT_MANAGER_NAMESPACE" "$display_temp"
+    
+    # Process ingress-nginx pods
+    process_namespace_pods "$INGRESS_NAMESPACE" "$display_temp"
     
     # If no pods were found, add a default entry
     if [ ! -s "$display_temp" ] || [ "$(jq '. | length' "$display_temp")" = "0" ]; then
@@ -696,7 +736,7 @@ check_system_health() {
     # Create table layout JSON
     local layout=$(cat <<EOF
 {
-  "theme": "Blue",
+  "theme": "$TABLE_THEME",
   "columns": [
     {
       "header": "NAMESPACE",
