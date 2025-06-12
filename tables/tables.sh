@@ -22,10 +22,11 @@ declare -g DEFAULT_PADDING=1
 # Each theme defines colors and ASCII characters for table borders
 declare -A RED_THEME=(
     [border_color]='\033[0;31m' # Red border color
-    [header_color]='\033[0;32m' # Green header color
-    [title_color]='\033[1;37m'  # White title color (bright)
-    [totals_color]='\033[1;37m' # White totals color (bright, same as title)
-    [text_color]='\033[0m'      # Default text color (terminal default)
+    [caption_color]='\033[0;32m' # Green caption color (column headers)
+    [header_color]='\033[1;37m'  # White header color (bright, table header)
+    [footer_color]='\033[0;36m'  # Cyan footer color (non-bold)
+    [summary_color]='\033[1;37m' # White summary color (bright, summary row)
+    [text_color]='\033[0m'       # Default text color (terminal default)
     [tl_corner]='╭'             # Top-left corner
     [tr_corner]='╮'             # Top-right corner
     [bl_corner]='╰'             # Bottom-left corner
@@ -41,10 +42,11 @@ declare -A RED_THEME=(
 
 declare -A BLUE_THEME=(
     [border_color]='\033[0;34m' # Blue border color
-    [header_color]='\033[0;34m' # Blue header color
-    [title_color]='\033[1;37m'  # White title color (bright)
-    [totals_color]='\033[1;37m' # White totals color (bright, same as title)
-    [text_color]='\033[0m'      # Default text color
+    [caption_color]='\033[0;34m' # Blue caption color (column headers)
+    [header_color]='\033[1;37m'  # White header color (bright, table header)
+    [footer_color]='\033[0;36m'  # Cyan footer color (non-bold)
+    [summary_color]='\033[1;37m' # White summary color (bright, summary row)
+    [text_color]='\033[0m'       # Default text color
     [tl_corner]='╭'
     [tr_corner]='╮'
     [bl_corner]='╰'
@@ -100,24 +102,24 @@ get_theme() {
     esac
 }
 
-# Datatype registry: Maps datatypes to validation, formatting, and total functions
+# Datatype registry: Maps datatypes to validation, formatting, and summary functions
 # Format: [datatype_function]="function_name"
 declare -A DATATYPE_HANDLERS=(
     [text_validate]="validate_text"
     [text_format]="format_text"
-    [text_total_types]="count unique"
+    [text_summary_types]="count unique"
     [int_validate]="validate_number"
     [int_format]="format_number"
-    [int_total_types]="sum min max count unique"
+    [int_summary_types]="sum min max count unique"
     [float_validate]="validate_number"
     [float_format]="format_number"
-    [float_total_types]="sum min max count unique"
+    [float_summary_types]="sum min max count unique"
     [kcpu_validate]="validate_kcpu"
     [kcpu_format]="format_kcpu"
-    [kcpu_total_types]="sum count"
+    [kcpu_summary_types]="sum count"
     [kmem_validate]="validate_kmem"
     [kmem_format]="format_kmem"
-    [kmem_total_types]="sum count"
+    [kmem_summary_types]="sum count"
 )
 
 # Validation functions: Ensure data matches expected format
@@ -223,7 +225,7 @@ declare -a DATATYPES=()
 declare -a NULL_VALUES=()
 declare -a ZERO_VALUES=()
 declare -a FORMATS=()
-declare -a TOTALS=()
+declare -a SUMMARIES=()
 declare -a BREAKS=()
 declare -a STRING_LIMITS=()
 declare -a WRAP_MODES=()
@@ -234,10 +236,10 @@ declare -a SORT_KEYS=()
 declare -a SORT_DIRECTIONS=()
 declare -a SORT_PRIORITIES=()
 declare -a ROW_JSONS=()
-declare -A SUM_TOTALS=()
-declare -A COUNT_TOTALS=()
-declare -A MIN_TOTALS=()
-declare -A MAX_TOTALS=()
+declare -A SUM_SUMMARIES=()
+declare -A COUNT_SUMMARIES=()
+declare -A MIN_SUMMARIES=()
+declare -A MAX_SUMMARIES=()
 declare -A UNIQUE_VALUES=()
 
 # validate_input_files: Check if layout and data files exist and are valid
@@ -280,7 +282,7 @@ parse_layout_file() {
     
     # Validate title position
     case "$TITLE_POSITION" in
-        left|right|center|none) ;;
+        left|right|center|full|none) ;;
         *) 
             echo -e "${THEME[border_color]}Warning: Invalid title position '$TITLE_POSITION', using 'none'${THEME[text_color]}" >&2
             TITLE_POSITION="none"
@@ -289,7 +291,7 @@ parse_layout_file() {
     
     # Validate footer position
     case "$FOOTER_POSITION" in
-        left|right|center|none) ;;
+        left|right|center|full|none) ;;
         *) 
             echo -e "${THEME[border_color]}Warning: Invalid footer position '$FOOTER_POSITION', using 'none'${THEME[text_color]}" >&2
             FOOTER_POSITION="none"
@@ -328,7 +330,7 @@ parse_column_config() {
     NULL_VALUES=()
     ZERO_VALUES=()
     FORMATS=()
-    TOTALS=()
+    SUMMARIES=()
     BREAKS=()
     STRING_LIMITS=()
     WRAP_MODES=()
@@ -351,7 +353,7 @@ parse_column_config() {
         NULL_VALUES[$i]=$(jq -r '.null_value // "blank"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         ZERO_VALUES[$i]=$(jq -r '.zero_value // "blank"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         FORMATS[$i]=$(jq -r '.format // ""' <<<"$col_json")
-        TOTALS[$i]=$(jq -r '.total // "none"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        SUMMARIES[$i]=$(jq -r '.summary // "none"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         BREAKS[$i]=$(jq -r '.break // false' <<<"$col_json")
         STRING_LIMITS[$i]=$(jq -r '.string_limit // 0' <<<"$col_json")
         WRAP_MODES[$i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
@@ -360,7 +362,7 @@ parse_column_config() {
         
         debug_log "Column $i: Header=${HEADERS[$i]}, Key=${KEYS[$i]}, Datatype=${DATATYPES[$i]}"
         
-        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${TOTALS[$i]}"
+        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
     done
     
     # Initialize column widths based on header lengths plus padding or specified width
@@ -385,9 +387,9 @@ parse_column_config() {
 }
 
 # validate_column_config: Validate column configuration and print warnings
-# Args: column_index, header, justification, datatype, total
+# Args: column_index, header, justification, datatype, summary
 validate_column_config() {
-    local i="$1" header="$2" justification="$3" datatype="$4" total="$5"
+    local i="$1" header="$2" justification="$3" datatype="$4" summary="$5"
     
     if [[ -z "$header" ]]; then
         echo -e "${THEME[border_color]}Error: Column $i has no header${THEME[text_color]}" >&2
@@ -404,10 +406,10 @@ validate_column_config() {
         DATATYPES[$i]="text"
     fi
     
-    local valid_totals="${DATATYPE_HANDLERS[${DATATYPES[$i]}_total_types]}"
-    if [[ "$total" != "none" && ! " $valid_totals " =~ " $total " ]]; then
-        echo -e "${THEME[border_color]}Warning: Total '$total' not supported for datatype '${DATATYPES[$i]}' in column $header, using 'none'${THEME[text_color]}" >&2
-        TOTALS[$i]="none"
+    local valid_summaries="${DATATYPE_HANDLERS[${DATATYPES[$i]}_summary_types]}"
+    if [[ "$summary" != "none" && ! " $valid_summaries " =~ " $summary " ]]; then
+        echo -e "${THEME[border_color]}Warning: Summary '$summary' not supported for datatype '${DATATYPES[$i]}' in column $header, using 'none'${THEME[text_color]}" >&2
+        SUMMARIES[$i]="none"
     fi
 }
 
@@ -447,22 +449,22 @@ parse_sort_config() {
     done
 }
 
-# initialize_totals: Initialize totals storage
-initialize_totals() {
-    debug_log "Initializing totals storage"
+# initialize_summaries: Initialize summaries storage
+initialize_summaries() {
+    debug_log "Initializing summaries storage"
     
-    # Clear total associative arrays
-    SUM_TOTALS=()
-    COUNT_TOTALS=()
-    MIN_TOTALS=()
-    MAX_TOTALS=()
+    # Clear summary associative arrays
+    SUM_SUMMARIES=()
+    COUNT_SUMMARIES=()
+    MIN_SUMMARIES=()
+    MAX_SUMMARIES=()
     UNIQUE_VALUES=()
     
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        SUM_TOTALS[$i]=0
-        COUNT_TOTALS[$i]=0
-        MIN_TOTALS[$i]=""
-        MAX_TOTALS[$i]=""
+        SUM_SUMMARIES[$i]=0
+        COUNT_SUMMARIES[$i]=0
+        MIN_SUMMARIES[$i]=""
+        MAX_SUMMARIES[$i]=""
         UNIQUE_VALUES[$i]=""
     done
 }
@@ -553,7 +555,7 @@ sort_data() {
     fi
 }
 
-# process_data_rows: Process data rows, update widths and calculate totals
+# process_data_rows: Process data rows, update widths and calculate summaries
 # Args: data_json
 # Side effect: Updates global MAX_LINES
 process_data_rows() {
@@ -617,132 +619,132 @@ process_data_rows() {
                 local IFS="$wrap_char"
                 read -ra parts <<<"$display_value"
                 for part in "${parts[@]}"; do
-                local len=$(echo -n "$part" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
-                # Don't decrease length - we need the actual character count
-                [[ $len -gt $max_len ]] && max_len=$len
+                    local len=$(echo -n "$part" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                    # Don't decrease length - we need the actual character count
+                    [[ $len -gt $max_len ]] && max_len=$len
                 done
                 local padded_width=$((max_len + (2 * ${PADDINGS[$j]})))
                 [[ $padded_width -gt ${WIDTHS[$j]} ]] && WIDTHS[$j]=$padded_width
-            [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
-            debug_log "Wrapped value: parts=${#parts[@]}, max_len=$max_len, new width=${WIDTHS[$j]}"
-        else
-            local len=$(echo -n "$display_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
-            # Don't decrease length - we need the actual character count
-            local padded_width=$((len + (2 * ${PADDINGS[$j]})))
-            [[ $padded_width -gt ${WIDTHS[$j]} ]] && WIDTHS[$j]=$padded_width
-            debug_log "Plain value: len=$len, new width=${WIDTHS[$j]}"
-        fi
-        
-        # Update totals
-        update_totals "$j" "$value" "${DATATYPES[$j]}" "${TOTALS[$j]}"
-    done
-    
-    [[ $line_count -gt $MAX_LINES ]] && MAX_LINES=$line_count
-    done
-    
-    # After processing all rows, check if totals need wider columns
-    for ((j=0; j<COLUMN_COUNT; j++)); do
-        if [[ "${TOTALS[$j]}" != "none" ]]; then
-            local total_value="" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}"
+                [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
+                debug_log "Wrapped value: parts=${#parts[@]}, max_len=$max_len, new width=${WIDTHS[$j]}"
+            else
+                local len=$(echo -n "$display_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                # Don't decrease length - we need the actual character count
+                local padded_width=$((len + (2 * ${PADDINGS[$j]})))
+                [[ $padded_width -gt ${WIDTHS[$j]} ]] && WIDTHS[$j]=$padded_width
+                debug_log "Plain value: len=$len, new width=${WIDTHS[$j]}"
+            fi
             
-            # Calculate the expected total value based on total type
-            case "${TOTALS[$j]}" in
+            # Update summaries
+            update_summaries "$j" "$value" "${DATATYPES[$j]}" "${SUMMARIES[$j]}"
+        done
+        
+        [[ $line_count -gt $MAX_LINES ]] && MAX_LINES=$line_count
+    done
+    
+    # After processing all rows, check if summaries need wider columns
+    for ((j=0; j<COLUMN_COUNT; j++)); do
+        if [[ "${SUMMARIES[$j]}" != "none" ]]; then
+            local summary_value="" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}"
+            
+            # Calculate the expected summary value based on summary type
+            case "${SUMMARIES[$j]}" in
                 sum)
-                    if [[ -n "${SUM_TOTALS[$j]}" && "${SUM_TOTALS[$j]}" != "0" ]]; then
+                    if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
-                            total_value="${SUM_TOTALS[$j]}m"
+                            summary_value="${SUM_SUMMARIES[$j]}m"
                         elif [[ "$datatype" == "kmem" ]]; then
-                            total_value="${SUM_TOTALS[$j]}M"
+                            summary_value="${SUM_SUMMARIES[$j]}M"
                         elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
-                            total_value="${SUM_TOTALS[$j]}"
-                            [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                            summary_value="${SUM_SUMMARIES[$j]}"
+                            [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                         fi
                     fi
                     ;;
                 min)
-                    total_value="${MIN_TOTALS[$j]:-}"
-                    [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                    summary_value="${MIN_SUMMARIES[$j]:-}"
+                    [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                     ;;
                 max)
-                    total_value="${MAX_TOTALS[$j]:-}"
-                    [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                    summary_value="${MAX_SUMMARIES[$j]:-}"
+                    [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                     ;;
                 count)
-                    total_value="${COUNT_TOTALS[$j]:-0}"
+                    summary_value="${COUNT_SUMMARIES[$j]:-0}"
                     ;;
                 unique)
                     if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then
                         local unique_count=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}')
-                        total_value="$unique_count"
+                        summary_value="$unique_count"
                     else
-                        total_value="0"
+                        summary_value="0"
                     fi
                     ;;
             esac
             
-            # If total exists, check if its width requires column adjustment
-            if [[ -n "$total_value" ]]; then
-                local total_len=$(echo -n "$total_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
-                local total_padded_width=$((total_len + (2 * ${PADDINGS[$j]})))
+            # If summary exists, check if its width requires column adjustment
+            if [[ -n "$summary_value" ]]; then
+                local summary_len=$(echo -n "$summary_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                local summary_padded_width=$((summary_len + (2 * ${PADDINGS[$j]})))
                 
-                # Update column width if total needs more space
-                if [[ $total_padded_width -gt ${WIDTHS[$j]} ]]; then
-                    debug_log "Column $j (${HEADERS[$j]}): Adjusting width for total value '$total_value', new width=$total_padded_width"
-                    WIDTHS[$j]=$total_padded_width
+                # Update column width if summary needs more space
+                if [[ $summary_padded_width -gt ${WIDTHS[$j]} ]]; then
+                    debug_log "Column $j (${HEADERS[$j]}): Adjusting width for summary value '$summary_value', new width=$summary_padded_width"
+                    WIDTHS[$j]=$summary_padded_width
                 fi
             fi
         fi
     done
     
-    debug_log "Final column widths after total adjustment: ${WIDTHS[*]}"
+    debug_log "Final column widths after summary adjustment: ${WIDTHS[*]}"
     debug_log "Max lines per row: $MAX_LINES"
     debug_log "Total rows to render: ${#ROW_JSONS[@]}"
 }
 
-# update_totals: Update totals for a column
-# Args: column_index, value, datatype, total_type
-update_totals() {
-    local j="$1" value="$2" datatype="$3" total_type="$4"
+# update_summaries: Update summaries for a column
+# Args: column_index, value, datatype, summary_type
+update_summaries() {
+    local j="$1" value="$2" datatype="$3" summary_type="$4"
     
-    case "$total_type" in
+    case "$summary_type" in
         sum)
             if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then
-                SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%m} ))
+                SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%m} ))
             elif [[ "$datatype" == "kmem" ]]; then
                 if [[ "$value" =~ ^[0-9]+M$ ]]; then
-                    SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%M} ))
+                    SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%M} ))
                 elif [[ "$value" =~ ^[0-9]+G$ ]]; then
-                    SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%G} * 1000 ))
+                    SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%G} * 1000 ))
                 elif [[ "$value" =~ ^[0-9]+K$ ]]; then
-                    SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%K} / 1000 ))
+                    SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%K} / 1000 ))
                 elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then
-                    SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%Mi} ))
+                    SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Mi} ))
                 elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then
-                    SUM_TOTALS[$j]=$(( ${SUM_TOTALS[$j]:-0} + ${value%Gi} * 1000 ))
+                    SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Gi} * 1000 ))
                 fi
             elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
                 if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                    SUM_TOTALS[$j]=$(awk "BEGIN {print (${SUM_TOTALS[$j]:-0} + $value)}")
+                    SUM_SUMMARIES[$j]=$(awk "BEGIN {print (${SUM_SUMMARIES[$j]:-0} + $value)}")
                 fi
             fi
             ;;
         min)
             if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MIN_TOTALS[$j]}" || $(awk "BEGIN {print $value < ${MIN_TOTALS[$j]}}") -eq 1 ]]; then
-                    MIN_TOTALS[$j]="$value"
+                if [[ -z "${MIN_SUMMARIES[$j]}" || $(awk "BEGIN {print $value < ${MIN_SUMMARIES[$j]}}") -eq 1 ]]; then
+                    MIN_SUMMARIES[$j]="$value"
                 fi
             fi
             ;;
         max)
             if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MAX_TOTALS[$j]}" || $(awk "BEGIN {print $value > ${MAX_TOTALS[$j]}}") -eq 1 ]]; then
-                    MAX_TOTALS[$j]="$value"
+                if [[ -z "${MAX_SUMMARIES[$j]}" || $(awk "BEGIN {print $value > ${MAX_SUMMARIES[$j]}}") -eq 1 ]]; then
+                    MAX_SUMMARIES[$j]="$value"
                 fi
             fi
             ;;
         count)
             if [[ -n "$value" && "$value" != "null" ]]; then
-                COUNT_TOTALS[$j]=$(( ${COUNT_TOTALS[$j]:-0} + 1 ))
+                COUNT_SUMMARIES[$j]=$(( ${COUNT_SUMMARIES[$j]:-0} + 1 ))
             fi
             ;;
         unique)
@@ -760,9 +762,13 @@ calculate_title_width() {
         if [[ "$TITLE_POSITION" == "none" ]]; then
             # Default behavior - title width is the length of the title plus padding on both sides
             TITLE_WIDTH=$((${#title} + (2 * DEFAULT_PADDING)))
-        else
-            # For left, right, center - title width matches table width
+        elif [[ "$TITLE_POSITION" == "full" ]]; then
+            # Full alignment - title width matches table width
             TITLE_WIDTH=$total_table_width
+        else
+            # For left, right, center - title width is the length of the title plus padding, clipped to table width
+            TITLE_WIDTH=$((${#title} + (2 * DEFAULT_PADDING)))
+            [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width
         fi
     else
         TITLE_WIDTH=0
@@ -778,9 +784,13 @@ calculate_footer_width() {
         if [[ "$FOOTER_POSITION" == "none" ]]; then
             # Default behavior - footer width is the length of the footer plus padding on both sides
             FOOTER_WIDTH=$((${#footer} + (2 * DEFAULT_PADDING)))
-        else
-            # For left, right, center - footer width matches table width
+        elif [[ "$FOOTER_POSITION" == "full" ]]; then
+            # Full alignment - footer width matches table width
             FOOTER_WIDTH=$total_table_width
+        else
+            # For left, right, center - footer width is the length of the footer plus padding, clipped to table width
+            FOOTER_WIDTH=$((${#footer} + (2 * DEFAULT_PADDING)))
+            [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width
         fi
     else
         FOOTER_WIDTH=0
@@ -795,12 +805,37 @@ render_table_title() {
         debug_log "Rendering table title: $TABLE_TITLE with position: $TITLE_POSITION"
         calculate_title_width "$TABLE_TITLE" "$total_table_width"
         
-        # Render title top border
+        local offset=0
+        case "$TITLE_POSITION" in
+            left)
+                offset=0
+                ;;
+            right)
+                offset=$((total_table_width - TITLE_WIDTH))
+                ;;
+            center)
+                offset=$(((total_table_width - TITLE_WIDTH) / 2))
+                ;;
+            full)
+                offset=0
+                ;;
+            *)
+                offset=0
+                ;;
+        esac
+        
+        # Render title top border with offset
+        if [[ $offset -gt 0 ]]; then
+            printf "%*s" "$offset" ""
+        fi
         printf "${THEME[border_color]}${THEME[tl_corner]}"
         printf "${THEME[h_line]}%.0s" $(seq 1 $TITLE_WIDTH)
         printf "${THEME[tr_corner]}${THEME[text_color]}\n"
         
         # Render title text with appropriate alignment
+        if [[ $offset -gt 0 ]]; then
+            printf "%*s" "$offset" ""
+        fi
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
         
         local available_width=$((TITLE_WIDTH - (2 * DEFAULT_PADDING)))
@@ -813,27 +848,32 @@ render_table_title() {
         
         case "$TITLE_POSITION" in
             left)
-                # Left align
-                printf "%*s${THEME[title_color]}%-*s${THEME[text_color]}%*s" \
+                # Left align - no additional offset
+                printf "%*s${THEME[header_color]}%-*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
             right)
-                # Right align
-                printf "%*s${THEME[title_color]}%*s${THEME[text_color]}%*s" \
+                # Right align - already offset
+                printf "%*s${THEME[header_color]}%*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
             center)
-                # Center align
+                # Center align - already offset
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
+                      "$DEFAULT_PADDING" "" "$title_text" "$((available_width - ${#title_text} + DEFAULT_PADDING))" ""
+                ;;
+            full)
+                # Full alignment - center text within full table width
                 local text_len=${#title_text}
                 local spaces=$(( (available_width - text_len) / 2 ))
                 local left_spaces=$(( DEFAULT_PADDING + spaces ))
                 local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
                       "$left_spaces" "" "$title_text" "$right_spaces" ""
                 ;;
             *)
                 # Default (none) - original behavior
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
         esac
@@ -852,68 +892,49 @@ render_table_top_border() {
         [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((total_table_width++))
     done
     
-    # First character on line connecting title to table
+    local title_offset=0
     if [[ -n "$TABLE_TITLE" ]]; then
-        # If we have a title, use left junction character
-        printf "${THEME[border_color]}${THEME[l_junct]}"
-    else
-        # No title, use top-left corner
-        printf "${THEME[border_color]}${THEME[tl_corner]}"
+        case "$TITLE_POSITION" in
+            left)
+                title_offset=0
+                ;;
+            right)
+                title_offset=$((total_table_width - TITLE_WIDTH))
+                ;;
+            center)
+                title_offset=$(((total_table_width - TITLE_WIDTH) / 2))
+                ;;
+            full)
+                title_offset=0
+                ;;
+            *)
+                title_offset=0
+                ;;
+        esac
     fi
     
-    # Handle different title width scenarios
-    if [[ -n "$TABLE_TITLE" && $TITLE_WIDTH -lt $total_table_width ]]; then
-        # Calculate positions of all column separators
-        local column_widths_sum=0
-        local column_positions=()
+    # Calculate positions of all column separators
+    local column_widths_sum=0
+    local column_positions=()
+    
+    # Store the position of each column separator
+    for ((i=0; i<COLUMN_COUNT-1; i++)); do
+        column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
+        column_positions+=($column_widths_sum)
+        ((column_widths_sum++))  # +1 for the separator
+    done
+    
+    if [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" != "none" && "$TITLE_POSITION" != "full" ]]; then
+        # Handle titles with specific positioning (left, right, center)
         
-        # Store the position of each column separator
-        for ((i=0; i<COLUMN_COUNT-1; i++)); do
-            column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
-            column_positions+=($column_widths_sum)
-            ((column_widths_sum++))  # +1 for the separator
-        done
-        
-        # Create a character-by-character map of the top border line
-        local line_map=()
-        for ((i=0; i<total_table_width; i++)); do
-            line_map[$i]="${THEME[h_line]}"  # Default is horizontal line
-        done
-        
-        # Mark all column separators in the map
-        for ((i=0; i<${#column_positions[@]}; i++)); do
-            if [[ ${column_positions[$i]} -lt $total_table_width ]]; then
-                line_map[${column_positions[$i]}]="${THEME[t_junct]}"
-            fi
-        done
-        
-        # Handle the title's right edge
-        if [[ $TITLE_WIDTH -lt $total_table_width ]]; then
-            # Check if title edge aligns with a column separator
-            local title_at_column_separator=false
-            for ((i=0; i<${#column_positions[@]}; i++)); do
-                if [[ ${column_positions[$i]} -eq $TITLE_WIDTH ]]; then
-                    line_map[$TITLE_WIDTH]="${THEME[cross]}"  # Use cross at aligned position
-                    title_at_column_separator=true
-                    break
-                fi
-            done
-            
-            # If title doesn't align with a column separator, use bottom junction
-            if [[ "$title_at_column_separator" == "false" ]]; then
-                line_map[$TITLE_WIDTH]="${THEME[b_junct]}"
-            fi
+        # Now print the connecting line, adjusting for title position
+        if [[ "$TITLE_POSITION" == "left" ]]; then
+            printf "${THEME[border_color]}${THEME[l_junct]}"
+        else
+            printf "${THEME[border_color]}${THEME[tl_corner]}"
         fi
         
-        # Print the horizontal line character by character
-        for ((i=0; i<total_table_width; i++)); do
-            printf "%s" "${line_map[$i]}"
-        done
-        
-        # Close with the top-right corner of the table
-        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
-    else
-        # Title is wider than or equal to table, or no title - standard rendering
+        # Print the horizontal line with proper connectors
         for ((i=0; i<COLUMN_COUNT; i++)); do
             printf "${THEME[h_line]}%.0s" $(seq 1 ${WIDTHS[$i]})
             if [[ $i -lt $((COLUMN_COUNT-1)) ]]; then
@@ -921,27 +942,79 @@ render_table_top_border() {
             fi
         done
         
-        # Handle right border based on title width
-        if [[ -n "$TABLE_TITLE" ]]; then
-            if [[ $TITLE_WIDTH -gt $total_table_width ]]; then
-                # Title wider than table, use top junction at end of table
-                printf "${THEME[t_junct]}"
-                # Then extend line to match title width
-                local remaining_width=$((TITLE_WIDTH - total_table_width - 1))
-                printf "${THEME[h_line]}%.0s" $(seq 1 $remaining_width)
-                # Use bottom-right corner at the end to match the top-right corner from the title's first line
-                printf "${THEME[br_corner]}${THEME[text_color]}\n"
-            elif [[ $TITLE_WIDTH -eq $total_table_width ]]; then
-                # Title width equals table width, use right junction
-                printf "${THEME[r_junct]}${THEME[text_color]}\n"
-            else
-                # Title narrower than table width, use top-right corner
-                printf "${THEME[tr_corner]}${THEME[text_color]}\n"
-            fi
+        # Close with the appropriate corner or junction
+        if [[ "$TITLE_POSITION" == "right" && $title_right_edge -eq $total_table_width ]]; then
+            printf "${THEME[r_junct]}"  # Connect to title if it ends at table edge
         else
-            # No title, use top-right corner
-            printf "${THEME[tr_corner]}${THEME[text_color]}\n"
+            printf "${THEME[tr_corner]}"  # Otherwise use top-right corner
         fi
+        printf "${THEME[text_color]}\n"
+        
+    elif [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" == "full" ]]; then
+        # Handle full-width title
+        # Print the title
+        printf "${THEME[border_color]}${THEME[tl_corner]}"
+        printf "${THEME[h_line]}%.0s" $(seq 1 $total_table_width)
+        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
+        
+        # Print the title text
+        printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
+        
+        local available_width=$((total_table_width - (2 * DEFAULT_PADDING)))
+        local title_text="$TABLE_TITLE"
+        
+        # Clip text if it exceeds available width
+        if [[ ${#title_text} -gt $available_width ]]; then
+            title_text="${title_text:0:$available_width}"
+        fi
+        
+        # Center the text
+        local text_len=${#title_text}
+        local spaces=$(( (available_width - text_len) / 2 ))
+        local left_spaces=$(( DEFAULT_PADDING + spaces ))
+        local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
+        printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
+              "$left_spaces" "" "$title_text" "$right_spaces" ""
+        
+        printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}\n"
+        
+        # Print the connecting line
+        printf "${THEME[border_color]}${THEME[l_junct]}"
+        
+        # Print the horizontal line with proper connectors
+        for ((i=1; i<total_table_width; i++)); do
+            # Check if we're at a column separator
+            local at_column_separator=false
+            for ((j=0; j<${#column_positions[@]}; j++)); do
+                if [[ ${column_positions[$j]} -eq $i ]]; then
+                    at_column_separator=true
+                    break
+                fi
+            done
+            
+            if [[ "$at_column_separator" == "true" ]]; then
+                printf "${THEME[t_junct]}"  # Use top junction at column separator
+            else
+                printf "${THEME[h_line]}"  # Otherwise use horizontal line
+            fi
+        done
+        
+        # Close with the right junction
+        printf "${THEME[r_junct]}${THEME[text_color]}\n"
+        
+    else
+        # No title or title position is "none"
+        # Print the standard top border
+        printf "${THEME[border_color]}${THEME[tl_corner]}"
+        
+        for ((i=0; i<COLUMN_COUNT; i++)); do
+            printf "${THEME[h_line]}%.0s" $(seq 1 ${WIDTHS[$i]})
+            if [[ $i -lt $((COLUMN_COUNT-1)) ]]; then
+                printf "${THEME[t_junct]}"
+            fi
+        done
+        
+        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
     fi
 }
 
@@ -957,7 +1030,7 @@ render_table_headers() {
             right)
                 # Total available width minus padding on both sides
                 local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                printf "%*s${THEME[header_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "${content_width}" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
             center)
@@ -965,11 +1038,11 @@ render_table_headers() {
                 local header_spaces=$(( (content_width - ${#HEADERS[$i]}) / 2 ))
                 local left_spaces=$(( PADDINGS[$i] + header_spaces ))
                 local right_spaces=$(( PADDINGS[$i] + content_width - ${#HEADERS[$i]} - header_spaces ))
-                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${left_spaces}" "" "${HEADERS[$i]}" "${right_spaces}" ""
                 ;;
             *)
-                printf "%*s${THEME[header_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
         esac
@@ -1153,12 +1226,154 @@ render_table_footer() {
         debug_log "Rendering table footer: $TABLE_FOOTER with position: $FOOTER_POSITION"
         calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
         
-        # Render footer top border
-        printf "${THEME[border_color]}${THEME[tl_corner]}"
-        printf "${THEME[h_line]}%.0s" $(seq 1 $FOOTER_WIDTH)
-        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
+        local footer_offset=0
+        case "$FOOTER_POSITION" in
+            left)
+                footer_offset=0
+                ;;
+            right)
+                footer_offset=$((total_table_width - FOOTER_WIDTH))
+                ;;
+            center)
+                footer_offset=$(((total_table_width - FOOTER_WIDTH) / 2))
+                ;;
+            full)
+                footer_offset=0
+                ;;
+            *)
+                footer_offset=0
+                ;;
+        esac
+        
+        # Always start at the left edge of the table for the top border
+        if [[ -n "$TABLE_FOOTER" && "$FOOTER_POSITION" != "full" && $footer_offset -gt 0 ]]; then
+            # Use bottom-left corner if footer is not at the left edge
+            printf "${THEME[border_color]}${THEME[bl_corner]}"
+            # Fill the space before the footer with horizontal lines
+            printf "${THEME[h_line]}%.0s" $(seq 1 $footer_offset)
+            # Use left junction to connect to footer
+            printf "${THEME[l_junct]}"
+        elif [[ -n "$TABLE_FOOTER" ]]; then
+            # If footer starts at left or is full width, use left junction
+            printf "${THEME[border_color]}${THEME[l_junct]}"
+        else
+            # This case shouldn't occur, but fallback to left junction
+            printf "${THEME[border_color]}${THEME[l_junct]}"
+        fi
+        
+        # Render footer top border with logic to connect to the last row/summary
+        if [[ $FOOTER_WIDTH -lt $total_table_width && "$FOOTER_POSITION" != "full" ]]; then
+            # Calculate positions of all column separators
+            local column_widths_sum=0
+            local column_positions=()
+            for ((i=0; i<COLUMN_COUNT-1; i++)); do
+                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
+                column_positions+=($column_widths_sum)
+                ((column_widths_sum++))
+            done
+            # Create a character map for the border line
+            local line_map=()
+            for ((i=0; i<total_table_width; i++)); do
+                line_map[$i]="${THEME[h_line]}"
+            done
+            for ((i=0; i<${#column_positions[@]}; i++)); do
+                if [[ ${column_positions[$i]} -lt $total_table_width ]]; then
+                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
+                fi
+            done
+            # Handle footer's top edge connection
+            local footer_right_edge=$((footer_offset + FOOTER_WIDTH))
+            if [[ $footer_right_edge -lt $total_table_width ]]; then
+                local footer_at_column_separator=false
+                for ((i=0; i<${#column_positions[@]}; i++)); do
+                    if [[ ${column_positions[$i]} -eq $footer_right_edge ]]; then
+                        line_map[$footer_right_edge]="${THEME[cross]}"
+                        footer_at_column_separator=true
+                        break
+                    fi
+                done
+                if [[ "$footer_at_column_separator" == "false" ]]; then
+                    line_map[$footer_right_edge]="${THEME[t_junct]}"
+                fi
+            fi
+            # Print the line character by character
+            for ((i=0; i<total_table_width; i++)); do
+                printf "%s" "${line_map[$i]}"
+            done
+            # Handle the right edge connector based on footer position and width
+            if [[ $footer_right_edge -eq $total_table_width ]]; then
+                case "$FOOTER_POSITION" in
+                    right)
+                        printf "${THEME[r_junct]}"  # Right aligned and matches table width
+                        ;;
+                    center)
+                        printf "${THEME[br_corner]}"  # Centered and matches table width, use rounded corner
+                        ;;
+                    *)
+                        printf "${THEME[br_corner]}"  # Default to rounded corner
+                        ;;
+                esac
+            else
+                printf "${THEME[br_corner]}"  # Footer narrower than table, use rounded corner
+            fi
+            printf "${THEME[text_color]}\n"
+        elif [[ $FOOTER_WIDTH -eq $total_table_width || "$FOOTER_POSITION" == "full" ]]; then
+            # Calculate positions of all column separators
+            local column_widths_sum=0
+            local column_positions=()
+            for ((i=0; i<COLUMN_COUNT-1; i++)); do
+                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
+                column_positions+=($column_widths_sum)
+                ((column_widths_sum++))
+            done
+            # Create a character map for the border line
+            local line_map=()
+            for ((i=0; i<total_table_width; i++)); do
+                line_map[$i]="${THEME[h_line]}"
+            done
+            for ((i=0; i<${#column_positions[@]}; i++)); do
+                if [[ ${column_positions[$i]} -lt $total_table_width ]]; then
+                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
+                fi
+            done
+            # Print the line character by character
+            for ((i=0; i<total_table_width; i++)); do
+                printf "%s" "${line_map[$i]}"
+            done
+            printf "${THEME[r_junct]}${THEME[text_color]}\n"
+        else
+            # Footer wider than table width (shouldn't happen with clipping, but handle for completeness)
+            # Calculate positions of all column separators
+            local column_widths_sum=0
+            local column_positions=()
+            for ((i=0; i<COLUMN_COUNT-1; i++)); do
+                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
+                column_positions+=($column_widths_sum)
+                ((column_widths_sum++))
+            done
+            # Create a character map for the border line
+            local line_map=()
+            for ((i=0; i<FOOTER_WIDTH; i++)); do
+                line_map[$i]="${THEME[h_line]}"
+            done
+            for ((i=0; i<${#column_positions[@]}; i++)); do
+                if [[ ${column_positions[$i]} -lt $FOOTER_WIDTH ]]; then
+                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
+                fi
+            done
+            # Set a bottom junction at the right edge of the table
+            line_map[$total_table_width]="${THEME[b_junct]}"
+            # Print the line character by character
+            for ((i=0; i<FOOTER_WIDTH; i++)); do
+                printf "%s" "${line_map[$i]}"
+            done
+            printf "${THEME[tr_corner]}${THEME[text_color]}\n"
+        fi
         
         # Render footer text with appropriate alignment
+        if [[ $footer_offset -gt 0 ]]; then
+            printf "%*s" "$footer_offset" ""
+        fi
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
         
         local available_width=$((FOOTER_WIDTH - (2 * DEFAULT_PADDING)))
@@ -1171,27 +1386,32 @@ render_table_footer() {
         
         case "$FOOTER_POSITION" in
             left)
-                # Left align
-                printf "%*s${THEME[title_color]}%-*s${THEME[text_color]}%*s" \
+                # Left align - no additional offset
+                printf "%*s${THEME[footer_color]}%-*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             right)
-                # Right align
-                printf "%*s${THEME[title_color]}%*s${THEME[text_color]}%*s" \
+                # Right align - already offset
+                printf "%*s${THEME[footer_color]}%*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             center)
-                # Center align
+                # Center align - already offset
+                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
+                      "$DEFAULT_PADDING" "" "$footer_text" "$((available_width - ${#footer_text} + DEFAULT_PADDING))" ""
+                ;;
+            full)
+                # Full alignment - center text within full table width
                 local text_len=${#footer_text}
                 local spaces=$(( (available_width - text_len) / 2 ))
                 local left_spaces=$(( DEFAULT_PADDING + spaces ))
                 local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
                       "$left_spaces" "" "$footer_text" "$right_spaces" ""
                 ;;
             *)
                 # Default (none) - original behavior
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
         esac
@@ -1199,96 +1419,99 @@ render_table_footer() {
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}\n"
         
         # Render footer bottom border
+        if [[ $footer_offset -gt 0 ]]; then
+            printf "%*s" "$footer_offset" ""
+        fi
         printf "${THEME[border_color]}${THEME[bl_corner]}"
         printf "${THEME[h_line]}%.0s" $(seq 1 $FOOTER_WIDTH)
         printf "${THEME[br_corner]}${THEME[text_color]}\n"
     fi
 }
 
-# render_totals_row: Render the totals row if any totals are defined with special coloring
-# Returns: 0 if totals were rendered, 1 otherwise
-render_totals_row() {
-    debug_log "Checking if totals row should be rendered"
+# render_summaries_row: Render the summaries row if any summaries are defined with special coloring
+# Returns: 0 if summaries were rendered, 1 otherwise
+render_summaries_row() {
+    debug_log "Checking if summaries row should be rendered"
     
-    # Check if any totals are defined
-    local has_totals=false
+    # Check if any summaries are defined
+    local has_summaries=false
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        [[ "${TOTALS[$i]}" != "none" ]] && has_totals=true && break
+        [[ "${SUMMARIES[$i]}" != "none" ]] && has_summaries=true && break
     done
     
-    if [[ "$has_totals" == true ]]; then
-        debug_log "Rendering totals row"
+    if [[ "$has_summaries" == true ]]; then
+        debug_log "Rendering summaries row"
         render_table_separator "middle"
         
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
         for ((i=0; i<COLUMN_COUNT; i++)); do
-            local total_value="" datatype="${DATATYPES[$i]}" format="${FORMATS[$i]}"
-            case "${TOTALS[$i]}" in
+            local summary_value="" datatype="${DATATYPES[$i]}" format="${FORMATS[$i]}"
+            case "${SUMMARIES[$i]}" in
                 sum)
-                    if [[ -n "${SUM_TOTALS[$i]}" && "${SUM_TOTALS[$i]}" != "0" ]]; then
+                    if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
-                            total_value="${SUM_TOTALS[$i]}m"
+                            summary_value="${SUM_SUMMARIES[$i]}m"
                         elif [[ "$datatype" == "kmem" ]]; then
-                            total_value="${SUM_TOTALS[$i]}M"
+                            summary_value="${SUM_SUMMARIES[$i]}M"
                         elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
-                            total_value="${SUM_TOTALS[$i]}"
-                            [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                            summary_value="${SUM_SUMMARIES[$i]}"
+                            [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                         fi
                     fi
                     ;;
                 min)
-                    total_value="${MIN_TOTALS[$i]:-}"
-                    [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                    summary_value="${MIN_SUMMARIES[$i]:-}"
+                    [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                     ;;
                 max)
-                    total_value="${MAX_TOTALS[$i]:-}"
-                    [[ -n "$format" ]] && total_value=$(printf "$format" "$total_value")
+                    summary_value="${MAX_SUMMARIES[$i]:-}"
+                    [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
                     ;;
                 count)
-                    total_value="${COUNT_TOTALS[$i]:-0}"
+                    summary_value="${COUNT_SUMMARIES[$i]:-0}"
                     ;;
                 unique)
                     if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
-                        total_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}')
+                        summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}')
                     else
-                        total_value="0"
+                        summary_value="0"
                     fi
                     ;;
             esac
             
-            debug_log "Total for column $i (${HEADERS[$i]}, ${TOTALS[$i]}): $total_value"
+            debug_log "Summary for column $i (${HEADERS[$i]}, ${SUMMARIES[$i]}): $summary_value"
             
-            # Use totals_color for all total values
+            # Use summary_color for all summary values
             case "${JUSTIFICATIONS[$i]}" in
                 right)
                     local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                    printf "%*s${THEME[totals_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${PADDINGS[$i]}" "" "${content_width}" "$total_value" "${PADDINGS[$i]}" ""
+                    printf "%*s${THEME[summary_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${PADDINGS[$i]}" "" "${content_width}" "$summary_value" "${PADDINGS[$i]}" ""
                     ;;
                 center)
                     local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                    local value_spaces=$(( (content_width - ${#total_value}) / 2 ))
+                    local value_spaces=$(( (content_width - ${#summary_value}) / 2 ))
                     local left_spaces=$(( PADDINGS[$i] + value_spaces ))
-                    local right_spaces=$(( PADDINGS[$i] + content_width - ${#total_value} - value_spaces ))
-                    printf "%*s${THEME[totals_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${left_spaces}" "" "$total_value" "${right_spaces}" ""
+                    local right_spaces=$(( PADDINGS[$i] + content_width - ${#summary_value} - value_spaces ))
+                    printf "%*s${THEME[summary_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${left_spaces}" "" "$summary_value" "${right_spaces}" ""
                     ;;
                 *)
-                    printf "%*s${THEME[totals_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "$total_value" "${PADDINGS[$i]}" ""
+                    printf "%*s${THEME[summary_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "$summary_value" "${PADDINGS[$i]}" ""
                     ;;
             esac
         done
         printf "\n"
         
-        # Only render bottom border if there's no footer
+        # Do not render bottom border if there's a footer; it will be handled by render_table_footer
         if [[ -z "$TABLE_FOOTER" ]]; then
             render_table_separator "bottom"
         fi
         return 0
     fi
     
-    debug_log "No totals to render"
+    debug_log "No summaries to render"
     return 1
 }
 
@@ -1330,8 +1553,8 @@ draw_table() {
     parse_layout_file "$layout_file" || return 1
     get_theme "$THEME_NAME"
     
-    # Initialize totals storage
-    initialize_totals
+    # Initialize summaries storage
+    initialize_summaries
     
     # Read and prepare data
     local data_json
@@ -1341,7 +1564,7 @@ draw_table() {
     local sorted_data
     sorted_data=$(sort_data "$data_json")
     
-    # Process data rows, update widths and calculate totals
+    # Process data rows, update widths and calculate summaries
     process_data_rows "$sorted_data"
     
     debug_log "================ RENDERING TABLE ================"
@@ -1362,23 +1585,19 @@ draw_table() {
     render_table_separator "middle"
     render_data_rows "$MAX_LINES"
     
-    # Render totals row if needed
-    has_totals=false
-    if render_totals_row; then
-        has_totals=true
+    # Render summaries row if needed
+    has_summaries=false
+    if render_summaries_row; then
+        has_summaries=true
     fi
     
-    # If no totals and no footer, render bottom border
-    if [[ "$has_totals" == "false" && -z "$TABLE_FOOTER" ]]; then
+    # If no summaries and no footer, render bottom border
+    if [[ "$has_summaries" == "false" && -z "$TABLE_FOOTER" ]]; then
         render_table_separator "bottom"
     fi
     
     # Render footer if specified
     if [[ -n "$TABLE_FOOTER" ]]; then
-        # If no totals were rendered, we need to add a bottom border before the footer
-        if [[ "$has_totals" == "false" ]]; then
-            render_table_separator "bottom"
-        fi
         render_table_footer "$total_table_width"
     fi
     

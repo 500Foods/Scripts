@@ -150,13 +150,16 @@ get_ingress_domains() {
 {
   "theme": "$TABLE_THEME",
   "title": "Ingress Controller Domains",
+  "footer": "kubectl get ingress -A -o json",
+  "footer_position": "right",
   "columns": [
     {
       "header": "DOMAIN",
       "key": "domain",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 25
+      "string_limit": 25,
+      "summary": "count"
     },
     {
       "header": "NAMESPACE",
@@ -315,13 +318,16 @@ get_application_workloads() {
 {
   "theme": "$TABLE_THEME",
   "title": "Application Workloads",
+  "footer": "kubectl get pods -n <namespace> -l <selector> -o json",
+  "footer_position": "right",
   "columns": [
     {
       "header": "SERVICE",
       "key": "service",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 15
+      "string_limit": 15,
+      "summary": "count"
     },
     {
       "header": "NAMESPACE",
@@ -441,13 +447,16 @@ get_cert_manager_status() {
 {
   "theme": "$TABLE_THEME",
   "title": "Certificate Manager Status",
+  "footer": "kubectl get certificates -A -o json",
+  "footer_position": "right",
   "columns": [
     {
       "header": "DOMAIN",
       "key": "domain",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 25
+      "string_limit": 25,
+      "summary": "count"
     },
     {
       "header": "NAMESPACE",
@@ -628,13 +637,16 @@ find_domain_mismatches() {
 {
   "theme": "$TABLE_THEME",
   "title": "Domain Mismatches",
+  "footer": "Comparison of ingress and certificate domains",
+  "footer_position": "right",
   "columns": [
     {
       "header": "DOMAIN",
       "key": "domain",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 25
+      "string_limit": 25,
+      "summary": "count"
     },
     {
       "header": "STATUS",
@@ -732,13 +744,16 @@ check_system_health() {
 {
   "theme": "$TABLE_THEME",
   "title": "System Health Check",
+  "footer": "kubectl get pods -n <namespace> -o json",
+  "footer_position": "right",
   "columns": [
     {
       "header": "NAMESPACE",
       "key": "namespace",
       "datatype": "text",
       "justification": "left",
-      "string_limit": 13
+      "string_limit": 13,
+      "summary": "count"
     },
     {
       "header": "WORKLOAD",

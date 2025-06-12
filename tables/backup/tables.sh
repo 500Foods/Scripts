@@ -22,10 +22,11 @@ declare -g DEFAULT_PADDING=1
 # Each theme defines colors and ASCII characters for table borders
 declare -A RED_THEME=(
     [border_color]='\033[0;31m' # Red border color
-    [header_color]='\033[0;32m' # Green header color
-    [title_color]='\033[1;37m'  # White title color (bright)
-    [totals_color]='\033[1;37m' # White totals color (bright, same as title)
-    [text_color]='\033[0m'      # Default text color (terminal default)
+    [caption_color]='\033[0;32m' # Green caption color (column headers)
+    [header_color]='\033[1;37m'  # White header color (bright, table header)
+    [footer_color]='\033[1;36m'  # Cyan footer color (bright)
+    [summary_color]='\033[1;37m' # White summary color (bright, summary row)
+    [text_color]='\033[0m'       # Default text color (terminal default)
     [tl_corner]='╭'             # Top-left corner
     [tr_corner]='╮'             # Top-right corner
     [bl_corner]='╰'             # Bottom-left corner
@@ -41,10 +42,11 @@ declare -A RED_THEME=(
 
 declare -A BLUE_THEME=(
     [border_color]='\033[0;34m' # Blue border color
-    [header_color]='\033[0;34m' # Blue header color
-    [title_color]='\033[1;37m'  # White title color (bright)
-    [totals_color]='\033[1;37m' # White totals color (bright, same as title)
-    [text_color]='\033[0m'      # Default text color
+    [caption_color]='\033[0;34m' # Blue caption color (column headers)
+    [header_color]='\033[1;37m'  # White header color (bright, table header)
+    [footer_color]='\033[1;36m'  # Cyan footer color (bright)
+    [summary_color]='\033[1;37m' # White summary color (bright, summary row)
+    [text_color]='\033[0m'       # Default text color
     [tl_corner]='╭'
     [tr_corner]='╮'
     [bl_corner]='╰'
@@ -814,12 +816,12 @@ render_table_title() {
         case "$TITLE_POSITION" in
             left)
                 # Left align
-                printf "%*s${THEME[title_color]}%-*s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%-*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
             right)
                 # Right align
-                printf "%*s${THEME[title_color]}%*s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
             center)
@@ -828,12 +830,12 @@ render_table_title() {
                 local spaces=$(( (available_width - text_len) / 2 ))
                 local left_spaces=$(( DEFAULT_PADDING + spaces ))
                 local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
                       "$left_spaces" "" "$title_text" "$right_spaces" ""
                 ;;
             *)
                 # Default (none) - original behavior
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$title_text" "$DEFAULT_PADDING" ""
                 ;;
         esac
@@ -957,7 +959,7 @@ render_table_headers() {
             right)
                 # Total available width minus padding on both sides
                 local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                printf "%*s${THEME[header_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "${content_width}" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
             center)
@@ -965,11 +967,11 @@ render_table_headers() {
                 local header_spaces=$(( (content_width - ${#HEADERS[$i]}) / 2 ))
                 local left_spaces=$(( PADDINGS[$i] + header_spaces ))
                 local right_spaces=$(( PADDINGS[$i] + content_width - ${#HEADERS[$i]} - header_spaces ))
-                printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${left_spaces}" "" "${HEADERS[$i]}" "${right_spaces}" ""
                 ;;
             *)
-                printf "%*s${THEME[header_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                printf "%*s${THEME[caption_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "${HEADERS[$i]}" "${PADDINGS[$i]}" ""
                 ;;
         esac
@@ -1172,12 +1174,12 @@ render_table_footer() {
         case "$FOOTER_POSITION" in
             left)
                 # Left align
-                printf "%*s${THEME[title_color]}%-*s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%-*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             right)
                 # Right align
-                printf "%*s${THEME[title_color]}%*s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%*s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             center)
@@ -1186,12 +1188,12 @@ render_table_footer() {
                 local spaces=$(( (available_width - text_len) / 2 ))
                 local left_spaces=$(( DEFAULT_PADDING + spaces ))
                 local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
                       "$left_spaces" "" "$footer_text" "$right_spaces" ""
                 ;;
             *)
                 # Default (none) - original behavior
-                printf "%*s${THEME[title_color]}%s${THEME[text_color]}%*s" \
+                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
                       "$DEFAULT_PADDING" "" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
         esac
@@ -1258,11 +1260,11 @@ render_totals_row() {
             
             debug_log "Total for column $i (${HEADERS[$i]}, ${TOTALS[$i]}): $total_value"
             
-            # Use totals_color for all total values
+            # Use summary_color for all total values
             case "${JUSTIFICATIONS[$i]}" in
                 right)
                     local content_width=$((WIDTHS[$i] - (2 * PADDINGS[$i])))
-                    printf "%*s${THEME[totals_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                    printf "%*s${THEME[summary_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                           "${PADDINGS[$i]}" "" "${content_width}" "$total_value" "${PADDINGS[$i]}" ""
                     ;;
                 center)
@@ -1270,11 +1272,11 @@ render_totals_row() {
                     local value_spaces=$(( (content_width - ${#total_value}) / 2 ))
                     local left_spaces=$(( PADDINGS[$i] + value_spaces ))
                     local right_spaces=$(( PADDINGS[$i] + content_width - ${#total_value} - value_spaces ))
-                    printf "%*s${THEME[totals_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                    printf "%*s${THEME[summary_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                           "${left_spaces}" "" "$total_value" "${right_spaces}" ""
                     ;;
                 *)
-                    printf "%*s${THEME[totals_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                    printf "%*s${THEME[summary_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                           "${PADDINGS[$i]}" "" "$((WIDTHS[$i] - (2 * PADDINGS[$i])))" "$total_value" "${PADDINGS[$i]}" ""
                     ;;
             esac
