@@ -89,8 +89,6 @@ echo "Ingress Namespace: $INGRESS_NAMESPACE"
 
 # Function to get ingress domains and their backends
 get_ingress_domains() {
-    echo -e "\n=== Ingress Controller Domains ==="
-    
     # Create temporary files
     local ingress_temp="${TEMP_DIR}/ingress_temp.json"
     local domains_temp="${TEMP_DIR}/domains_temp.json"
@@ -151,6 +149,7 @@ get_ingress_domains() {
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
+  "title": "Ingress Controller Domains",
   "columns": [
     {
       "header": "DOMAIN",
@@ -240,8 +239,6 @@ EOF
 
 # Function to get application workloads
 get_application_workloads() {
-    echo "=== Application Workloads ==="
-    
     local service_info_file="${TEMP_DIR}/service_info.txt"
     
     if [ ! -f "$service_info_file" ]; then
@@ -317,6 +314,7 @@ get_application_workloads() {
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
+  "title": "Application Workloads",
   "columns": [
     {
       "header": "SERVICE",
@@ -390,8 +388,6 @@ EOF
 
 # Function to get certificate manager status
 get_cert_manager_status() {
-    echo "=== Certificate Manager Status ==="
-    
     # Create temporary files
     local cert_temp="${TEMP_DIR}/cert_temp.json"
     local display_temp="${TEMP_DIR}/cert_display.json"
@@ -440,10 +436,11 @@ get_cert_manager_status() {
     
     debug "Certificate data processed and saved to ${TEMP_DIR}/cert_display_final.json"
     
-    # Create table layout JSON
+  # Create table layout JSON
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
+  "title": "Certificate Manager Status",
   "columns": [
     {
       "header": "DOMAIN",
@@ -527,8 +524,6 @@ EOF
 
 # Function to find domains in ingress but not in cert-manager and vice versa
 find_domain_mismatches() {
-    echo "=== Domain Mismatches ==="
-    
     # Check if domain files exist
     if [ ! -f "${TEMP_DIR}/ingress_domains.txt" ] || [ ! -f "${TEMP_DIR}/cert_domains.txt" ]; then
         echo "Domain files not found. Run get_ingress_domains and get_cert_manager_status first."
@@ -628,10 +623,11 @@ find_domain_mismatches() {
         fi
     fi
     
-    # Create table layout JSON
+  # Create table layout JSON
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
+  "title": "Domain Mismatches",
   "columns": [
     {
       "header": "DOMAIN",
@@ -670,8 +666,6 @@ EOF
 
 # Function to check cert-manager and ingress controller health
 check_system_health() {
-    echo "=== System Health Check ==="
-    
     # Create temporary files
     local display_temp="${TEMP_DIR}/health_data.json"
     
@@ -733,10 +727,11 @@ check_system_health() {
         echo '[{"namespace":"No Pods Found","workload":"Missing","worktype":"Missing","node":"N/A","pod":"N/A","status":"Unknown","age":"N/A"}]' > "$display_temp"
     fi
     
-    # Create table layout JSON
+  # Create table layout JSON
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
+  "title": "System Health Check",
   "columns": [
     {
       "header": "NAMESPACE",
