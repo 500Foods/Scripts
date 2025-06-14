@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# node_info.sh - Kubernetes Node and Pod Information Tool
+# node_info.sh - DOKS Node and Pod Information Tool
 #
 # Version History:
+# 2.2.4 - Removed Kubernetes from various places, added DOKS
 # 2.2.3 - Added options to select table, quiet mode, and theme
 # 2.2.2 - Added Pod Images table 
 # 2.2.1 - Fixed RAM extraction and added sums to all resource columns
@@ -47,11 +48,11 @@ while [ $# -gt 0 ]; do
             echo "  --theme, -t <theme> Set the theme for tables (default: Red)"
             echo "  --tables, -b <tables> Specify tables to display (e.g., ABD for tables A, B, and D)"
             echo "Tables:"
-            echo "  A: Kubernetes Nodes Overview"
+            echo "  A: Nodes Overview"
             echo "  B: Node Resource Usage"
-            echo "  C: Pods on Node"
-            echo "  D: Pod Resource Usage on Node"
-            echo "  E: Pod Images on Node"
+            echo "  C: Pods on Nodes (per-Node)"
+            echo "  D: Pod Resource Usage on Node (per-Node)"
+            echo "  E: Pod Images on Node (per-Node)"
             exit 0
             ;;
         --debug|-d) DEBUG="true"; shift ;;
@@ -125,7 +126,7 @@ render_table() {
 
 # Print script header unless QUIET is true
 if [ "$QUIET" != "true" ]; then
-    echo "=== Kubernetes Node and Pod Information Tool (v$APPVERSION) ==="
+    echo "=== Node and Pod Information Tool (v$APPVERSION) ==="
 fi
 
 # Function to check metrics-server availability
@@ -220,7 +221,7 @@ get_node_info() {
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
-  "title": "A: Kubernetes Nodes Overview",
+  "title": "A: Nodes Overview",
   "footer": "kubectl get nodes -o json + doctl compute droplet get <node-name>",
   "footer_position": "right",
   "columns": [
@@ -312,9 +313,9 @@ EOF
     if [ -s "$data_file" ]; then
         # Render the table only if selected
         if [[ "$SELECTED_TABLES" == *"A"* ]]; then
-            render_table "Kubernetes Nodes Overview" "$layout_file" "$data_file"
+            render_table "Nodes Overview" "$layout_file" "$data_file"
         elif [ "$QUIET" != "true" ]; then
-            echo "Note: Table A (Kubernetes Nodes Overview) omitted per --tables option"
+            echo "Note: Table A (Nodes Overview) omitted per --tables option"
         fi
     else
         if [ "$QUIET" != "true" ]; then
