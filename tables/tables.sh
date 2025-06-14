@@ -7,7 +7,7 @@
 # Dependencies: jq, bash 4.0+, awk, sed
 
 # Version information
-declare -r VERSION="1.0.0"
+declare -r VERSION="1.0.1"
 
 # Debug flag - can be set by parent script
 DEBUG_FLAG=false
@@ -111,6 +111,9 @@ declare -A DATATYPE_HANDLERS=(
     [int_validate]="validate_number"
     [int_format]="format_number"
     [int_summary_types]="sum min max count unique"
+    [num_validate]="validate_number"
+    [num_format]="format_num"
+    [num_summary_types]="sum min max count unique"
     [float_validate]="validate_number"
     [float_format]="format_number"
     [float_summary_types]="sum min max count unique"
@@ -184,6 +187,23 @@ format_number() {
     [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }
     if [[ -n "$format" && "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
         printf "$format" "$value"
+    else
+        echo "$value"
+    fi
+}
+
+format_num() {
+    local value="$1" format="$2"
+    [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }
+    if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        # Format with thousands separator
+        if [[ -n "$format" ]]; then
+            # If a format is specified, use it
+            printf "$format" "$value"
+        else
+            # Otherwise, use awk to format with thousands separator
+            printf "%s" "$(echo "$value" | awk '{ printf "%\047d", $0 }')"
+        fi
     else
         echo "$value"
     fi
@@ -743,10 +763,10 @@ update_summaries() {
                 elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then
                     SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Gi} * 1000 ))
                 fi
-            elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
-                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                    SUM_SUMMARIES[$j]=$(awk "BEGIN {print (${SUM_SUMMARIES[$j]:-0} + $value)}")
-                fi
+    elif [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+        if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            SUM_SUMMARIES[$j]=$(awk "BEGIN {print (${SUM_SUMMARIES[$j]:-0} + $value)}")
+        fi
             fi
             ;;
         min)
@@ -903,6 +923,192 @@ render_table_title() {
     fi
 }
 
+# render_table_border: Shared function to render table borders (top or bottom)
+# Args: border_type ("top" or "bottom"), total_table_width, element_offset, element_right_edge, element_width, element_position, is_element_full
+# Logic for rendering the border:
+# 1. Determine the maximum width to render, which is the longer of the table width or the element (title/footer) width, ensuring that wider elements extend the full line.
+# 2. Calculate positions of column separators within the table width, adjusting for the left border to ensure accurate alignment.
+# 3. For each position in the border, determine the appropriate character to use:
+#    a. For the start and end of the entire line, use the appropriate corner characters.
+#    b. For column separators within the table, use the appropriate junction characters.
+#    c. For the start and end of the element (title/footer), if present, use the appropriate junction characters.
+#    d. For all other positions, use the horizontal line character.
+# 4. Print the border line character by character, using the determined characters.
+render_table_border() {
+    local border_type="$1"
+    local total_table_width="$2"
+    local element_offset="$3"
+    local element_right_edge="$4"
+    local element_width="$5"
+    local element_position="$6"
+    local is_element_full="$7"
+    
+    debug_log "Rendering $border_type border with total width: $total_table_width, element offset: $element_offset, element right edge: $element_right_edge, element width: $element_width"
+    
+    # Calculate positions of all column separators
+    local column_widths_sum=0
+    local column_positions=()
+    for ((i=0; i<COLUMN_COUNT-1; i++)); do
+        column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
+        column_positions+=($column_widths_sum)
+        ((column_widths_sum++))  # +1 for the separator
+    done
+    
+    # Determine maximum width to render (longer of table width or element width if present)
+    # Add 2 to account for left and right border characters
+    local max_width=$((total_table_width + 2))
+    if [[ -n "$element_width" && $element_width -gt 0 ]]; then
+        # If element width is provided, compare with table width to determine max width
+        local adjusted_element_width=$((element_width + 2))
+        if [[ $adjusted_element_width -gt $max_width ]]; then
+            max_width=$adjusted_element_width
+        fi
+    fi
+    
+    debug_log "Max width for $border_type border: $max_width"
+    
+    # Print the border line character by character
+    printf "${THEME[border_color]}"
+    for ((i=0; i<max_width; i++)); do
+        local char_to_print="${THEME[h_line]}"  # Default to horizontal line character
+        
+        # Determine the appropriate character for this position
+        if [[ $i -eq 0 ]]; then
+            # Left edge of the table
+            if [[ -n "$element_width" && $element_width -gt 0 && $element_offset -eq 0 ]]; then
+                # If header/footer starts at the left edge, use left junction
+                char_to_print="${THEME[l_junct]}"
+            elif [[ "$border_type" == "top" ]]; then
+                char_to_print="${THEME[tl_corner]}"
+            else
+                char_to_print="${THEME[bl_corner]}"
+            fi
+        elif [[ $i -eq $((max_width - 1)) ]]; then
+            # Right edge of the table
+            if [[ -n "$element_width" && $element_width -gt 0 ]]; then
+                if [[ $element_right_edge -gt $total_table_width ]]; then
+                    # If header/footer extends beyond the right edge
+                    if [[ "$border_type" == "top" ]]; then
+                        # For top border with header wider than table, use bottom-right corner
+                        char_to_print="${THEME[br_corner]}"
+                    else
+                        # For bottom border with footer wider than table, use top-right corner
+                        char_to_print="${THEME[tr_corner]}"
+                    fi
+                elif [[ $element_right_edge -eq $total_table_width ]]; then
+                    # If header/footer width is exactly the table width, use right junction
+                    char_to_print="${THEME[r_junct]}"
+                elif [[ "$border_type" == "top" ]]; then
+                    char_to_print="${THEME[tr_corner]}"
+                else
+                    char_to_print="${THEME[br_corner]}"
+                fi
+            elif [[ "$border_type" == "top" ]]; then
+                char_to_print="${THEME[tr_corner]}"
+            else
+                char_to_print="${THEME[br_corner]}"
+            fi
+        elif [[ $i -eq $((total_table_width + 1)) && $i -lt $((max_width - 1)) ]]; then
+            # Right edge of table when header/footer is wider
+            if [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -gt $((total_table_width - 1)) ]]; then
+                # Header/footer is wider than the table
+                if [[ "$border_type" == "top" ]]; then
+                    # For top border with header wider than table, use top junction
+                    char_to_print="${THEME[t_junct]}"
+                else
+                    # For bottom border with footer wider than table, use bottom junction
+                    char_to_print="${THEME[b_junct]}"
+                fi
+            else
+                char_to_print="${THEME[r_junct]}"
+            fi
+        elif [[ $i -eq $element_offset && -n "$element_width" && $element_offset -gt 0 && $element_offset -lt $((total_table_width + 1)) ]]; then
+            # Start of header/footer within table bounds
+            # Check if this position is also a column separator
+            local is_column_separator=false
+            for pos in "${column_positions[@]}"; do
+                local adjusted_pos=$((pos + 1))  # Adjust for the left border character
+                if [[ $i -eq $adjusted_pos ]]; then
+                    is_column_separator=true
+                    break
+                fi
+            done
+            
+            if [[ "$is_column_separator" == "true" ]]; then
+                # If it's also a column separator, use cross
+                char_to_print="${THEME[cross]}"
+            elif [[ "$border_type" == "top" ]]; then
+                # For top border with header not on the left, use bottom junction
+                char_to_print="${THEME[b_junct]}"
+            else
+                # For bottom border with footer not on the left, use top junction
+                char_to_print="${THEME[t_junct]}"
+            fi
+        elif [[ $i -eq $((element_right_edge + 1)) && -n "$element_width" && $((element_right_edge + 1)) -lt $((total_table_width + 1)) ]]; then
+            # End of header/footer within table bounds
+            # Check if this position is also a column separator
+            local is_column_separator=false
+            for pos in "${column_positions[@]}"; do
+                local adjusted_pos=$((pos + 1))  # Adjust for the left border character
+                if [[ $i -eq $adjusted_pos ]]; then
+                    is_column_separator=true
+                    break
+                fi
+            done
+            
+            if [[ "$is_column_separator" == "true" ]]; then
+                # If it's also a column separator, use cross
+                char_to_print="${THEME[cross]}"
+            elif [[ "$border_type" == "top" ]]; then
+                # For top border with title ending before table end, use bottom junction
+                char_to_print="${THEME[b_junct]}"
+            else
+                # For bottom border with footer ending before table end, use top junction
+                char_to_print="${THEME[t_junct]}"
+            fi
+        else
+            # Check if this position is a column separator
+            local is_column_separator=false
+            for pos in "${column_positions[@]}"; do
+                local adjusted_pos=$((pos + 1))  # Adjust for the left border character
+                if [[ $i -eq $adjusted_pos ]]; then
+                    is_column_separator=true
+                    break
+                fi
+            done
+            
+            if [[ "$is_column_separator" == "true" ]]; then
+                # Column separator
+                if [[ "$border_type" == "top" ]]; then
+                    char_to_print="${THEME[t_junct]}"
+                else
+                    char_to_print="${THEME[b_junct]}"
+                fi
+            elif [[ "$border_type" == "bottom" && -n "$element_width" && $element_width -gt 0 ]]; then
+                # For bottom border with footer, check if this position needs a connector
+                if [[ $i -eq $element_offset && $element_offset -ge 0 ]]; then
+                    # Start of footer
+                    char_to_print="${THEME[l_junct]}"
+                elif [[ $i -eq $((element_right_edge + 1)) && $((element_right_edge + 1)) -lt $max_width ]]; then
+                    # End of footer
+                    char_to_print="${THEME[r_junct]}"
+                fi
+            fi
+            
+            # Special case for perfect title width and wide title
+            if [[ "$border_type" == "top" && -n "$element_width" && $element_width -gt 0 ]]; then
+                if [[ $element_right_edge -eq $((total_table_width - 1)) && $i -gt $((total_table_width + 1)) ]]; then
+                    # Perfect title width - remove any extra characters at the end
+                    char_to_print=""
+                fi
+            fi
+        fi
+        
+        printf "%s" "$char_to_print"
+    done
+    printf "${THEME[text_color]}\n"
+}
+
 # render_table_top_border: Render the top border of the table
 render_table_top_border() {
     debug_log "Rendering top border"
@@ -914,70 +1120,41 @@ render_table_top_border() {
     done
     
     local title_offset=0
+    local title_right_edge=0
+    local title_width=""
+    local title_position="none"
     if [[ -n "$TABLE_TITLE" ]]; then
+        title_width=$TITLE_WIDTH
+        title_position=$TITLE_POSITION
         case "$TITLE_POSITION" in
             left)
                 title_offset=0
+                title_right_edge=$TITLE_WIDTH
                 ;;
             right)
                 title_offset=$((total_table_width - TITLE_WIDTH))
+                title_right_edge=$total_table_width
                 ;;
             center)
                 title_offset=$(((total_table_width - TITLE_WIDTH) / 2))
+                title_right_edge=$((title_offset + TITLE_WIDTH))
                 ;;
             full)
                 title_offset=0
+                title_right_edge=$total_table_width
                 ;;
             *)
                 title_offset=0
+                title_right_edge=$TITLE_WIDTH
                 ;;
         esac
     fi
     
-    # Calculate positions of all column separators
-    local column_widths_sum=0
-    local column_positions=()
+    # Call shared border rendering function for top border
+    render_table_border "top" "$total_table_width" "$title_offset" "$title_right_edge" "$title_width" "$title_position" "$([[ "$title_position" == "full" ]] && echo true || echo false)"
     
-    # Store the position of each column separator
-    for ((i=0; i<COLUMN_COUNT-1; i++)); do
-        column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
-        column_positions+=($column_widths_sum)
-        ((column_widths_sum++))  # +1 for the separator
-    done
-    
-    if [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" != "none" && "$TITLE_POSITION" != "full" ]]; then
-        # Handle titles with specific positioning (left, right, center)
-        
-        # Now print the connecting line, adjusting for title position
-        if [[ "$TITLE_POSITION" == "left" ]]; then
-            printf "${THEME[border_color]}${THEME[l_junct]}"
-        else
-            printf "${THEME[border_color]}${THEME[tl_corner]}"
-        fi
-        
-        # Print the horizontal line with proper connectors
-        for ((i=0; i<COLUMN_COUNT; i++)); do
-            printf "${THEME[h_line]}%.0s" $(seq 1 ${WIDTHS[$i]})
-            if [[ $i -lt $((COLUMN_COUNT-1)) ]]; then
-                printf "${THEME[t_junct]}"
-            fi
-        done
-        
-        # Close with the appropriate corner or junction
-        if [[ "$TITLE_POSITION" == "right" && $title_right_edge -eq $total_table_width ]]; then
-            printf "${THEME[r_junct]}"  # Connect to title if it ends at table edge
-        else
-            printf "${THEME[tr_corner]}"  # Otherwise use top-right corner
-        fi
-        printf "${THEME[text_color]}\n"
-        
-    elif [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" == "full" ]]; then
-        # Handle full-width title
-        # Print the title
-        printf "${THEME[border_color]}${THEME[tl_corner]}"
-        printf "${THEME[h_line]}%.0s" $(seq 1 $total_table_width)
-        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
-        
+    # If title is full width, render the title text and a connecting line
+    if [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" == "full" ]]; then
         # Print the title text
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
         
@@ -999,44 +1176,57 @@ render_table_top_border() {
         
         printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}\n"
         
-        # Print the connecting line
-        printf "${THEME[border_color]}${THEME[l_junct]}"
-        
-        # Print the horizontal line with proper connectors
-        for ((i=1; i<total_table_width; i++)); do
-            # Check if we're at a column separator
-            local at_column_separator=false
-            for ((j=0; j<${#column_positions[@]}; j++)); do
-                if [[ ${column_positions[$j]} -eq $i ]]; then
-                    at_column_separator=true
-                    break
-                fi
-            done
-            
-            if [[ "$at_column_separator" == "true" ]]; then
-                printf "${THEME[t_junct]}"  # Use top junction at column separator
-            else
-                printf "${THEME[h_line]}"  # Otherwise use horizontal line
-            fi
-        done
-        
-        # Close with the right junction
-        printf "${THEME[r_junct]}${THEME[text_color]}\n"
-        
-    else
-        # No title or title position is "none"
-        # Print the standard top border
-        printf "${THEME[border_color]}${THEME[tl_corner]}"
-        
-        for ((i=0; i<COLUMN_COUNT; i++)); do
-            printf "${THEME[h_line]}%.0s" $(seq 1 ${WIDTHS[$i]})
-            if [[ $i -lt $((COLUMN_COUNT-1)) ]]; then
-                printf "${THEME[t_junct]}"
-            fi
-        done
-        
-        printf "${THEME[tr_corner]}${THEME[text_color]}\n"
+        # Print the connecting line using the shared function
+        render_table_border "top" "$total_table_width" "0" "$total_table_width" "$total_table_width" "full" "true"
     fi
+}
+
+# render_table_bottom_border: Render the bottom border of the table
+render_table_bottom_border() {
+    debug_log "Rendering bottom border"
+    
+    local total_table_width=0
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        ((total_table_width += WIDTHS[$i]))
+        [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((total_table_width++))
+    done
+    
+    local footer_offset=0
+    local footer_right_edge=0
+    local footer_width=""
+    local footer_position="none"
+    if [[ -n "$TABLE_FOOTER" ]]; then
+        # Calculate footer width before rendering border
+        calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
+        footer_width=$FOOTER_WIDTH
+        footer_position=$FOOTER_POSITION
+        case "$FOOTER_POSITION" in
+            left)
+                footer_offset=0
+                footer_right_edge=$FOOTER_WIDTH
+                ;;
+            right)
+                footer_offset=$((total_table_width - FOOTER_WIDTH))
+                footer_right_edge=$total_table_width
+                ;;
+            center)
+                footer_offset=$(((total_table_width - FOOTER_WIDTH) / 2))
+                footer_right_edge=$((footer_offset + FOOTER_WIDTH))
+                ;;
+            full)
+                footer_offset=0
+                footer_right_edge=$total_table_width
+                ;;
+            *)
+                footer_offset=0
+                footer_right_edge=$FOOTER_WIDTH
+                ;;
+        esac
+        debug_log "Footer calculated: width=$footer_width, offset=$footer_offset, right_edge=$footer_right_edge, position=$footer_position"
+    fi
+    
+    # Call shared border rendering function for bottom border with footer details to mark connectors
+    render_table_border "bottom" "$total_table_width" "$footer_offset" "$footer_right_edge" "$footer_width" "$footer_position" "$([[ "$footer_position" == "full" ]] && echo true || echo false)"
 }
 
 # render_table_headers: Render the table headers row
@@ -1240,6 +1430,8 @@ render_data_rows() {
 
 # render_table_footer: Render the footer section if a footer is specified
 # Args: total_table_width - the total width of the table
+# Note: The top border of the footer is not rendered here as it is handled by render_table_bottom_border()
+#       to ensure connectors are marked on the table's bottom border.
 render_table_footer() {
     local total_table_width="$1"
     
@@ -1266,136 +1458,10 @@ render_table_footer() {
                 ;;
         esac
         
-        # Always start at the left edge of the table for the top border
-        if [[ -n "$TABLE_FOOTER" && "$FOOTER_POSITION" != "full" && $footer_offset -gt 0 ]]; then
-            # Use bottom-left corner if footer is not at the left edge
-            printf "${THEME[border_color]}${THEME[bl_corner]}"
-            # Fill the space before the footer with horizontal lines
-            printf "${THEME[h_line]}%.0s" $(seq 1 $footer_offset)
-            # Use left junction to connect to footer
-            printf "${THEME[l_junct]}"
-        elif [[ -n "$TABLE_FOOTER" ]]; then
-            # If footer starts at left or is full width, use left junction
-            printf "${THEME[border_color]}${THEME[l_junct]}"
-        else
-            # This case shouldn't occur, but fallback to left junction
-            printf "${THEME[border_color]}${THEME[l_junct]}"
-        fi
-        
-        # Render footer top border with logic to connect to the last row/summary
-        if [[ $FOOTER_WIDTH -lt $total_table_width && "$FOOTER_POSITION" != "full" ]]; then
-            # Calculate positions of all column separators
-            local column_widths_sum=0
-            local column_positions=()
-            for ((i=0; i<COLUMN_COUNT-1; i++)); do
-                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
-                column_positions+=($column_widths_sum)
-                ((column_widths_sum++))
-            done
-            # Create a character map for the border line
-            local line_map=()
-            for ((i=0; i<total_table_width; i++)); do
-                line_map[$i]="${THEME[h_line]}"
-            done
-            for ((i=0; i<${#column_positions[@]}; i++)); do
-                if [[ ${column_positions[$i]} -lt $total_table_width ]]; then
-                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
-                fi
-            done
-            # Handle footer's top edge connection
-            local footer_right_edge=$((footer_offset + FOOTER_WIDTH))
-            if [[ $footer_right_edge -lt $total_table_width ]]; then
-                local footer_at_column_separator=false
-                for ((i=0; i<${#column_positions[@]}; i++)); do
-                    if [[ ${column_positions[$i]} -eq $footer_right_edge ]]; then
-                        line_map[$footer_right_edge]="${THEME[cross]}"
-                        footer_at_column_separator=true
-                        break
-                    fi
-                done
-                if [[ "$footer_at_column_separator" == "false" ]]; then
-                    line_map[$footer_right_edge]="${THEME[t_junct]}"
-                fi
-            fi
-            # Print the line character by character
-            for ((i=0; i<total_table_width; i++)); do
-                printf "%s" "${line_map[$i]}"
-            done
-            # Handle the right edge connector based on footer position and width
-            if [[ $footer_right_edge -eq $total_table_width ]]; then
-                case "$FOOTER_POSITION" in
-                    right)
-                        printf "${THEME[r_junct]}"  # Right aligned and matches table width
-                        ;;
-                    center)
-                        printf "${THEME[br_corner]}"  # Centered and matches table width, use rounded corner
-                        ;;
-                    *)
-                        printf "${THEME[br_corner]}"  # Default to rounded corner
-                        ;;
-                esac
-            else
-                printf "${THEME[br_corner]}"  # Footer narrower than table, use rounded corner
-            fi
-            printf "${THEME[text_color]}\n"
-        elif [[ $FOOTER_WIDTH -eq $total_table_width || "$FOOTER_POSITION" == "full" ]]; then
-            # Calculate positions of all column separators
-            local column_widths_sum=0
-            local column_positions=()
-            for ((i=0; i<COLUMN_COUNT-1; i++)); do
-                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
-                column_positions+=($column_widths_sum)
-                ((column_widths_sum++))
-            done
-            # Create a character map for the border line
-            local line_map=()
-            for ((i=0; i<total_table_width; i++)); do
-                line_map[$i]="${THEME[h_line]}"
-            done
-            for ((i=0; i<${#column_positions[@]}; i++)); do
-                if [[ ${column_positions[$i]} -lt $total_table_width ]]; then
-                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
-                fi
-            done
-            # Print the line character by character
-            for ((i=0; i<total_table_width; i++)); do
-                printf "%s" "${line_map[$i]}"
-            done
-            printf "${THEME[r_junct]}${THEME[text_color]}\n"
-        else
-            # Footer wider than table width (shouldn't happen with clipping, but handle for completeness)
-            # Calculate positions of all column separators
-            local column_widths_sum=0
-            local column_positions=()
-            for ((i=0; i<COLUMN_COUNT-1; i++)); do
-                column_widths_sum=$((column_widths_sum + WIDTHS[$i]))
-                column_positions+=($column_widths_sum)
-                ((column_widths_sum++))
-            done
-            # Create a character map for the border line
-            local line_map=()
-            for ((i=0; i<FOOTER_WIDTH; i++)); do
-                line_map[$i]="${THEME[h_line]}"
-            done
-            for ((i=0; i<${#column_positions[@]}; i++)); do
-                if [[ ${column_positions[$i]} -lt $FOOTER_WIDTH ]]; then
-                    line_map[${column_positions[$i]}]="${THEME[b_junct]}"
-                fi
-            done
-            # Set a bottom junction at the right edge of the table
-            line_map[$total_table_width]="${THEME[b_junct]}"
-            # Print the line character by character
-            for ((i=0; i<FOOTER_WIDTH; i++)); do
-                printf "%s" "${line_map[$i]}"
-            done
-            printf "${THEME[tr_corner]}${THEME[text_color]}\n"
-        fi
-        
         # Render footer text with appropriate alignment
         if [[ $footer_offset -gt 0 ]]; then
             printf "%*s" "$footer_offset" ""
         fi
-        printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}"
         
         local available_width=$((FOOTER_WIDTH - (2 * DEFAULT_PADDING)))
         local footer_text="$TABLE_FOOTER"
@@ -1408,17 +1474,17 @@ render_table_footer() {
         case "$FOOTER_POSITION" in
             left)
                 # Left align - no additional offset
-                printf "%*s${THEME[footer_color]}%-*s${THEME[text_color]}%*s" \
+                printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}%*s${THEME[footer_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             right)
                 # Right align - already offset
-                printf "%*s${THEME[footer_color]}%*s${THEME[text_color]}%*s" \
+                printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}%*s${THEME[footer_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "$DEFAULT_PADDING" "" "$available_width" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
             center)
                 # Center align - already offset
-                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
+                printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}%*s${THEME[footer_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "$DEFAULT_PADDING" "" "$footer_text" "$((available_width - ${#footer_text} + DEFAULT_PADDING))" ""
                 ;;
             full)
@@ -1427,17 +1493,17 @@ render_table_footer() {
                 local spaces=$(( (available_width - text_len) / 2 ))
                 local left_spaces=$(( DEFAULT_PADDING + spaces ))
                 local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
+                printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}%*s${THEME[footer_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "$left_spaces" "" "$footer_text" "$right_spaces" ""
                 ;;
             *)
                 # Default (none) - original behavior
-                printf "%*s${THEME[footer_color]}%s${THEME[text_color]}%*s" \
+                printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}%*s${THEME[footer_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                       "$DEFAULT_PADDING" "" "$footer_text" "$DEFAULT_PADDING" ""
                 ;;
         esac
         
-        printf "${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}\n"
+        printf "\n"
         
         # Render footer bottom border
         if [[ $footer_offset -gt 0 ]]; then
@@ -1532,10 +1598,9 @@ render_summaries_row() {
         done
         printf "\n"
         
-        # Do not render bottom border if there's a footer; it will be handled by render_table_footer
-        if [[ -z "$TABLE_FOOTER" ]]; then
-            render_table_separator "bottom"
-        fi
+        # Do not render bottom border here; it will be handled by render_table_bottom_border()
+        # regardless of whether a footer is present
+        :
         return 0
     fi
     
@@ -1554,9 +1619,10 @@ calculate_table_width() {
     echo "$width"
 }
 
-# draw_table: Main function to render a table from JSON layout and data
-# Args: layout_json_file, data_json_file, [--debug], [--version]
-# Outputs: ASCII table to stdout, errors/debug to stderr
+# draw_table: Main function to render an ASCII table from JSON layout and data files
+# Args: layout_json_file (path to layout JSON), data_json_file (path to data JSON),
+#       [--debug] (enable debug logs), [--version] (show version)
+# Outputs: ASCII table to stdout, errors and debug messages to stderr
 draw_table() {
     local layout_file="$1" data_file="$2" debug=false
     shift 2
@@ -1619,10 +1685,8 @@ draw_table() {
         has_summaries=true
     fi
     
-    # If no summaries and no footer, render bottom border
-    if [[ "$has_summaries" == "false" && -z "$TABLE_FOOTER" ]]; then
-        render_table_separator "bottom"
-    fi
+    # Render bottom border, which will handle footer connection if present
+    render_table_bottom_border
     
     # Render footer if specified
     if [[ -n "$TABLE_FOOTER" ]]; then
