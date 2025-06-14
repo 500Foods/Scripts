@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # node_info.sh - Kubernetes Node and Pod Information Tool
-# Version: 2.2.1
 #
 # Version History:
+# 2.2.3 - Added options to select table, quiet mode, and theme
+# 2.2.2 - Added Pod Images table 
 # 2.2.1 - Fixed RAM extraction and added sums to all resource columns
 # 2.2.0 - Added debug mode and fixed RAM values in pod resource usage table
 # 2.1.9 - Fixed RAM values in pod resource usage table
@@ -25,23 +26,44 @@
 # Usage: ./node_info.sh [--debug]
 
 # Configuration
-APPVERSION="2.2.1"
+APPVERSION="2.2.2"
 DEBUG="false"
+QUIET="false"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TABLES_SCRIPT="${SCRIPT_DIR}/../tables/tables.sh"
 TEMP_DIR=$(mktemp -d)
 TABLE_THEME="Red"
+SELECTED_TABLES="ABCDE"  # Default to all tables (A, B, C, D, E)
 
 # Parse arguments
 while [ $# -gt 0 ]; do
     case "$1" in
-        --debug) DEBUG="true"; shift ;;
+        --help|-h) 
+            echo "Usage: ./node_info.sh [options]"
+            echo "Options:"
+            echo "  --help, -h          Show this help message and exit"
+            echo "  --debug, -d         Enable debug mode"
+            echo "  --quiet, -q         Suppress non-table output"
+            echo "  --theme, -t <theme> Set the theme for tables (default: Red)"
+            echo "  --tables, -b <tables> Specify tables to display (e.g., ABD for tables A, B, and D)"
+            echo "Tables:"
+            echo "  A: Kubernetes Nodes Overview"
+            echo "  B: Node Resource Usage"
+            echo "  C: Pods on Node"
+            echo "  D: Pod Resource Usage on Node"
+            echo "  E: Pod Images on Node"
+            exit 0
+            ;;
+        --debug|-d) DEBUG="true"; shift ;;
+        --quiet|-q) QUIET="true"; shift ;;
+        --theme|-t) TABLE_THEME="$2"; shift 2 ;;
+        --tables|-b) SELECTED_TABLES="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-# If DEBUG is true, print a message
-if [ "$DEBUG" = "true" ]; then
+# If DEBUG is true, print a message unless QUIET is true
+if [ "$DEBUG" = "true" ] && [ "$QUIET" != "true" ]; then
     echo "Debug mode enabled"
 fi
 
@@ -62,7 +84,9 @@ trap cleanup EXIT
 
 # Check if tables.sh exists
 if [ ! -f "$TABLES_SCRIPT" ]; then
-    echo "Error: tables.sh not found at $TABLES_SCRIPT"
+    if [ "$QUIET" != "true" ]; then
+        echo "Error: tables.sh not found at $TABLES_SCRIPT"
+    fi
     exit 1
 fi
 
@@ -99,8 +123,10 @@ render_table() {
     bash "$TABLES_SCRIPT" "$layout_file" "$data_file" $debug_flag
 }
 
-# Print script header
-echo "=== Kubernetes Node and Pod Information Tool (v$APPVERSION) ==="
+# Print script header unless QUIET is true
+if [ "$QUIET" != "true" ]; then
+    echo "=== Kubernetes Node and Pod Information Tool (v$APPVERSION) ==="
+fi
 
 # Function to check metrics-server availability
 check_metrics_server() {
@@ -194,7 +220,7 @@ get_node_info() {
     local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
-  "title": "Kubernetes Nodes Overview",
+  "title": "A: Kubernetes Nodes Overview",
   "footer": "kubectl get nodes -o json + doctl compute droplet get <node-name>",
   "footer_position": "right",
   "columns": [
@@ -284,10 +310,16 @@ EOF
     
     # Check if data was generated successfully
     if [ -s "$data_file" ]; then
-        # Render the table
-        render_table "Kubernetes Nodes Overview" "$layout_file" "$data_file"
+        # Render the table only if selected
+        if [[ "$SELECTED_TABLES" == *"A"* ]]; then
+            render_table "Kubernetes Nodes Overview" "$layout_file" "$data_file"
+        elif [ "$QUIET" != "true" ]; then
+            echo "Note: Table A (Kubernetes Nodes Overview) omitted per --tables option"
+        fi
     else
+        if [ "$QUIET" != "true" ]; then
         echo "Error: Failed to generate node data"
+    fi
         return 1
     fi
     
@@ -347,7 +379,7 @@ EOF
         local metrics_layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
-  "title": "Node Resource Usage",
+  "title": "B: Node Resource Usage",
   "footer": "kubectl top nodes + kubectl get nodes -o json",
   "footer_position": "right",
   "columns": [
@@ -435,13 +467,21 @@ EOF
         
         # Check if metrics data was generated successfully
         if [ -s "$metrics_data_file" ]; then
-            # Render the metrics table
-            render_table "Node Resource Usage" "$metrics_layout_file" "$metrics_data_file"
+            # Render the metrics table only if selected
+            if [[ "$SELECTED_TABLES" == *"B"* ]]; then
+                render_table "Node Resource Usage" "$metrics_layout_file" "$metrics_data_file"
+            elif [ "$QUIET" != "true" ]; then
+                echo "Note: Table B (Node Resource Usage) omitted per --tables option"
+            fi
         else
+            if [ "$QUIET" != "true" ]; then
             echo "Note: No resource usage data available"
         fi
+        fi
     else
+        if [ "$QUIET" != "true" ]; then
         echo "Note: metrics-server not available - node resource usage data omitted"
+    fi
     fi
     
     return 0
@@ -507,7 +547,7 @@ EOF
         local layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
-  "title": "Pods on Node $node_name",
+  "title": "C: Pods on Node $node_name",
   "footer": "kubectl get pods -A -o json | filter by nodeName",
   "footer_position": "right",
   "columns": [
@@ -573,10 +613,16 @@ EOF
         
         # Check if pod data was generated successfully
         if [ -s "$data_file" ]; then
-            # Render the table
-            render_table "Pods on Node $node_name" "$layout_file" "$data_file"
+            # Render the table only if selected
+            if [[ "$SELECTED_TABLES" == *"C"* ]]; then
+                render_table "Pods on Node $node_name" "$layout_file" "$data_file"
+            elif [ "$QUIET" != "true" ]; then
+                echo "Note: Table C (Pods on Node $node_name) omitted per --tables option"
+            fi
         else
-            echo "Note: No pods found on node $node_name"
+            if [ "$QUIET" != "true" ]; then
+        echo "Note: No pods found on node $node_name"
+    fi
         fi
         
         # If metrics are available, display pod resource usage for this node
@@ -822,7 +868,7 @@ EOF
             local metrics_layout=$(cat <<EOF
 {
   "theme": "$TABLE_THEME",
-  "title": "Pod Resource Usage on Node $node_name",
+  "title": "D: Pod Resource Usage on Node $node_name",
   "footer": "kubectl top pods -A + kubectl get pod -o json",
   "footer_position": "right",
   "columns": [
@@ -926,12 +972,133 @@ EOF
             
             # Render the pod metrics table if there is data
             if [ -s "$metrics_data_file" ] && [ "$(echo "$metrics_data" | jq 'length')" -gt 0 ]; then
-                render_table "Pod Resource Usage on Node $node_name" "$metrics_layout_file" "$metrics_data_file"
+                if [[ "$SELECTED_TABLES" == *"D"* ]]; then
+                    render_table "Pod Resource Usage on Node $node_name" "$metrics_layout_file" "$metrics_data_file"
+                elif [ "$QUIET" != "true" ]; then
+                    echo "Note: Table D (Pod Resource Usage on Node $node_name) omitted per --tables option"
+                fi
             else
-                echo "Note: No resource usage data available for pods on node $node_name"
+                if [ "$QUIET" != "true" ]; then
+            echo "Note: No resource usage data available for pods on node $node_name"
+        fi
+            fi
+            
+            # Create a temporary file to store pod images data
+            local pod_images_file="${TEMP_DIR}/pod_images_data.json"
+            echo "[]" > "$pod_images_file"
+            
+            # Process each pod on this node to extract image information
+            echo "$node_pods_data" | jq -c '.[]' | while read -r pod_json; do
+                local pod_name=$(echo "$pod_json" | jq -r '.pod')
+                local pod_namespace=$(echo "$pod_json" | jq -r '.namespace')
+                local pod_workload=$(echo "$pod_json" | jq -r '.workload')
+                local pod_worktype=$(echo "$pod_json" | jq -r '.worktype')
+                
+                debug "Processing images for pod: $pod_namespace/$pod_name"
+                
+                # Extract images for the pod using jq to join with commas
+                local images=""
+                images=$(jq -r --arg ns "$pod_namespace" --arg name "$pod_name" '.items[] | select(.metadata.namespace == $ns and .metadata.name == $name) | [.spec.containers[].image] | join(", ")' "$pods_temp")
+                
+                # Remove SHA hash part (anything from '@' onwards) from each image string
+                images=$(echo "$images" | sed 's/@[^,]*//g')
+                
+                if [ -z "$images" ]; then
+                    images="No images found"
+                fi
+                
+                # Create image JSON for the table
+                local image_json=$(cat <<EOF
+{
+  "pod": "$pod_name",
+  "namespace": "$pod_namespace",
+  "workload": "$pod_workload",
+  "worktype": "$pod_worktype",
+  "images": "$images"
+}
+EOF
+)
+                debug "Image JSON for pod $pod_namespace/$pod_name: $image_json"
+                
+                # Append to pod images file
+                jq --argjson img "$image_json" '. += [$img]' "$pod_images_file" > "${pod_images_file}.tmp" && mv "${pod_images_file}.tmp" "$pod_images_file"
+            done
+            
+            # Use the pod images data
+            local images_data=$(cat "$pod_images_file")
+            
+            # Create table layout JSON for pod images on this node
+            local images_layout=$(cat <<EOF
+{
+  "theme": "$TABLE_THEME",
+  "title": "E: Pod Images on Node $node_name",
+  "footer": "kubectl get pods -A -o json",
+  "footer_position": "right",
+  "columns": [
+    {
+      "header": "POD",
+      "key": "pod",
+      "datatype": "text",
+      "justification": "left",
+      "string_limit": 30,
+      "summary": "count"
+    },
+    {
+      "header": "NAMESPACE",
+      "key": "namespace",
+      "datatype": "text",
+      "justification": "left",
+      "string_limit": 15,
+      "break": true
+    },
+    {
+      "header": "WORKLOAD",
+      "key": "workload",
+      "datatype": "text",
+      "justification": "left",
+      "string_limit": 10
+    },
+    {
+      "header": "WORKTYPE",
+      "key": "worktype",
+      "datatype": "text",
+      "justification": "left",
+      "string_limit": 10
+    },
+    {
+      "header": "IMAGES",
+      "key": "images",
+      "datatype": "text",
+      "justification": "left",
+      "string_limit": 50,
+      "wrap_mode": "wrap",
+      "wrap_char": ","
+    }
+  ]
+}
+EOF
+)
+            
+            # Create layout and data files for pod images
+            local images_layout_file=$(create_table_layout "pod_images_node_$node_name" "$images_layout")
+            local images_data_file=$(create_table_data "pod_images_node_$node_name" "$images_data")
+            
+            # Render the pod images table if there is data
+            if [ -s "$images_data_file" ] && [ "$(echo "$images_data" | jq 'length')" -gt 0 ]; then
+                if [[ "$SELECTED_TABLES" == *"E"* ]]; then
+                    render_table "Pod Images on Node $node_name" "$images_layout_file" "$images_data_file"
+                elif [ "$QUIET" != "true" ]; then
+                    echo "Note: Table E (Pod Images on Node $node_name) omitted per --tables option"
+                fi
+            else
+                if [ "$QUIET" != "true" ]; then
+        echo "Note: No image data available for pods on node $node_name"
+    fi
             fi
         else
-            echo "Note: metrics-server not available - pod resource usage data for node $node_name omitted"
+            if [ "$QUIET" != "true" ]; then
+        echo "Note: metrics-server not available - pod resource usage data for node $node_name omitted"
+    fi
         fi
     done
     
@@ -944,7 +1111,9 @@ main() {
     get_node_info
     get_node_pods_info
     
-    echo "=== Audit Complete (v$APPVERSION) ==="
+    if [ "$QUIET" != "true" ]; then
+        echo "=== Audit Complete (v$APPVERSION) ==="
+    fi
 }
 
 # Run the main function
