@@ -27,7 +27,7 @@
 # Usage: ./node_info.sh [--debug]
 
 # Configuration
-APPVERSION="2.2.2"
+APPVERSION="2.2.4"
 DEBUG="false"
 QUIET="false"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
