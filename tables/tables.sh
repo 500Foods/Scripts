@@ -193,9 +193,13 @@ format_kcpu() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" || "$value" == "0" || "$value" == "0m" ]] && { echo ""; return; }
     if [[ "$value" =~ ^[0-9]+m$ ]]; then
-        echo "$value"
+        # Format with thousands separator
+        local num_part="${value%m}"
+        local formatted_num=$(echo "$num_part" | awk '{ printf "%\047d", $0 }')
+        echo "${formatted_num}m"
     elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        printf "%.0fm" "$(awk "BEGIN {print $value * 1000}")"
+        local num_value=$(awk "BEGIN {print $value * 1000}")
+        printf "%sm" "$(echo "$num_value" | awk '{ printf "%\047d", $0 }')"
     else
         echo ""
     fi
@@ -203,15 +207,25 @@ format_kcpu() {
 
 format_kmem() {
     local value="$1" format="$2"
-    [[ -z "$value" || "$value" == "null" || "$value" =~ ^0[MKG]$ ]] && { echo ""; return; }
+    [[ -z "$value" || "$value" == "null" || "$value" =~ ^0[MKG]$ || "$value" == "0Mi" || "$value" == "0Gi" || "$value" == "0Ki" ]] && { echo ""; return; }
     if [[ "$value" =~ ^[0-9]+[KMG]$ ]]; then
-        echo "$value"
+        # Format with thousands separator
+        local num_part="${value%[KMG]}"
+        local unit="${value: -1}"
+        local formatted_num=$(echo "$num_part" | awk '{ printf "%\047d", $0 }')
+        echo "${formatted_num}${unit}"
     elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then
-        echo "${value%Mi}M"
+        local num_part="${value%Mi}"
+        local formatted_num=$(echo "$num_part" | awk '{ printf "%\047d", $0 }')
+        echo "${formatted_num}M"
     elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then
-        echo "${value%Gi}G"
+        local num_part="${value%Gi}"
+        local formatted_num=$(echo "$num_part" | awk '{ printf "%\047d", $0 }')
+        echo "${formatted_num}G"
     elif [[ "$value" =~ ^[0-9]+Ki$ ]]; then
-        echo "${value%Ki}K"
+        local num_part="${value%Ki}"
+        local formatted_num=$(echo "$num_part" | awk '{ printf "%\047d", $0 }')
+        echo "${formatted_num}K"
     else
         echo ""
     fi
@@ -652,9 +666,16 @@ process_data_rows() {
                 sum)
                     if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
-                            summary_value="${SUM_SUMMARIES[$j]}m"
+                            # Format kcpu summary with thousands separator for width calculation
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$j]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}m"
                         elif [[ "$datatype" == "kmem" ]]; then
-                            summary_value="${SUM_SUMMARIES[$j]}M"
+                            # Format kmem summary with thousands separator for width calculation
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$j]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}M"
+                        elif [[ "$datatype" == "num" ]]; then
+                            # For num datatype, use format_num to apply thousands separator
+                            summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format")
                         elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
                             summary_value="${SUM_SUMMARIES[$j]}"
                             [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
@@ -1450,9 +1471,16 @@ render_summaries_row() {
                 sum)
                     if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
-                            summary_value="${SUM_SUMMARIES[$i]}m"
+                            # Format kcpu summary with thousands separator
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}m"
                         elif [[ "$datatype" == "kmem" ]]; then
-                            summary_value="${SUM_SUMMARIES[$i]}M"
+                            # Format kmem summary with thousands separator
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}M"
+                        elif [[ "$datatype" == "num" ]]; then
+                            # For num datatype, use format_num to apply thousands separator
+                            summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
                         elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
                             summary_value="${SUM_SUMMARIES[$i]}"
                             [[ -n "$format" ]] && summary_value=$(printf "$format" "$summary_value")
