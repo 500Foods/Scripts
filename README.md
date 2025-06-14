@@ -31,6 +31,12 @@ These scripts help manage and monitor Kubernetes clusters:
 - [Node Info](https://github.com/500Foods/Scripts/blob/main/kubernetes/nodeinfo.md) - Display detailed information about nodes and pods in a Kubernetes cluster (BASH)
 - [Domain Management](https://github.com/500Foods/Scripts/blob/main/kubernetes/dommgmt.md) - Audit ingress controllers and certificate manager configurations to identify mismatches (BASH)
 
+## PostgreSQL
+
+These scripts help with PostgreSQL database operations:
+
+- [PQuery](https://github.com/500Foods/Scripts/blob/main/postgres/pquery.md) - Execute PostgreSQL SELECT queries and render results as formatted terminal tables (BASH)
+
 ## GitHub
 
 These tools help manage GitHub repositories:
