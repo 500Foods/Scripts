@@ -1,0 +1,82 @@
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: RECIPE.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: RELEASES.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: SECRETS.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: docs/PORT_OVERRIDE_FEATURE.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: docs/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: docs/ai_integration.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: docs/developer_onboarding.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: docs/guides/quick-start.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: examples/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: oidc-client-examples/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: payload/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: src/api/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: tests/README.md
+Missing link in ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md: tools/README.md
+Missing link in README.md: kubernetes/dommgmt.md
+Missing link in README.md: kubernetes/nodeinfo.md
+
+=== Link Check Summary ===
+File: files/topcounts.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: dates/weeknumber.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: files/topfiles.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: README.md
+  Total Links: 12
+  Checked Links: 10
+  Missing Links: 2
+
+File: githubsync/githubsync.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: tables/tables.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: cloc/cloc.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: postgres/pquery.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: ../../../../../../../home/asimard/Projects/Acuranzo-Server-C/README.md
+  Total Links: 15
+  Checked Links: 1
+  Missing Links: 14
+
+File: dates/uptime-fancy.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: files/topdirs.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+File: files/findoldest.md
+  Total Links: 0
+  Checked Links: 0
+  Missing Links: 0
+
+
+=== Orphaned Markdown Files ===
+No orphaned files found
+

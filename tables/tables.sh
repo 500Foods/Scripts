@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 # tables.sh: Reusable table-drawing library for rendering JSON data as ASCII tables
-# Version: 1.0.0
 # Functions: draw_table
 # Usage: draw_table <layout_json_file> <data_json_file> [--debug] [--version]
 # Dependencies: jq, bash 4.0+, awk, sed
 
 # Version information
-declare -r VERSION="1.0.1"
+declare -r TABLES_VERSION="1.0.1"
 
 # Debug flag - can be set by parent script
 DEBUG_FLAG=false
@@ -1629,7 +1628,7 @@ draw_table() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --debug) debug=true; shift ;;
-            --version) echo "tables.sh version $VERSION"; return 0 ;;
+            --version) echo "tables.sh version $TABLES_VERSION"; return 0 ;;
             *) echo -e "${THEME[border_color]}Error: Unknown option: $1${THEME[text_color]}" >&2; return 1 ;;
         esac
     done
