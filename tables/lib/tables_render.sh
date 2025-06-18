@@ -11,7 +11,8 @@ render_table_title() {
         # shellcheck disable=SC2153
         debug_log "Rendering table title: $TABLE_TITLE with position: $TITLE_POSITION"
         # Evaluate any shell commands in the title before width calculation
-        local title_text=$(eval echo "$TABLE_TITLE" 2>/dev/null)
+        local title_text
+        title_text=$(eval echo "$TABLE_TITLE" 2>/dev/null)
         calculate_title_width "$title_text" "$total_table_width"
         
         local offset=0
@@ -588,7 +589,8 @@ render_table_footer() {
     if [[ -n "$TABLE_FOOTER" ]]; then
         debug_log "Rendering table footer: $TABLE_FOOTER with position: $FOOTER_POSITION"
         # Evaluate any shell commands in the footer before width calculation
-        local footer_text=$(eval echo "$TABLE_FOOTER" 2>/dev/null)
+        local footer_text
+        footer_text=$(eval echo "$TABLE_FOOTER" 2>/dev/null)
         calculate_footer_width "$footer_text" "$total_table_width"
         
         local footer_offset=0

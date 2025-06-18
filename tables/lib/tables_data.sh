@@ -343,14 +343,14 @@ update_summaries() {
             ;;
         min)
             if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MIN_SUMMARIES[$j]}" || $(awk "BEGIN {print $value < ${MIN_SUMMARIES[$j]}}") -eq 1 ]]; then
+                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || awk "BEGIN {if ($value < ${MIN_SUMMARIES[$j]}) exit 0; else exit 1}" 2>/dev/null; then
                     MIN_SUMMARIES[$j]="$value"
                 fi
             fi
             ;;
         max)
             if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MAX_SUMMARIES[$j]}" || $(awk "BEGIN {print $value > ${MAX_SUMMARIES[$j]}}") -eq 1 ]]; then
+                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || awk "BEGIN {if ($value > ${MAX_SUMMARIES[$j]}) exit 0; else exit 1}" 2>/dev/null; then
                     MAX_SUMMARIES[$j]="$value"
                 fi
             fi

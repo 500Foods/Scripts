@@ -390,4 +390,4 @@ EOF
 
 echo -e "\nTest 2-H: All available summary types for floating point data"
 echo "-------------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" 
+"$tables_script" "$layout_file" "$data_file"

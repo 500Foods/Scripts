@@ -160,7 +160,7 @@ Tables.sh supports the following data types:
 Text data with optional wrapping and length limits.
 
 - **Validation**: Any non-null text value
-- **Formatting**: Raw text with optional clipping/wrapping
+- **Formatting**: Raw text with enhanced clipping and wrapping options
 - **Summary Types**: `count`, `unique`
 
 ### int / float
@@ -202,6 +202,7 @@ Depending on the data type, the following summary calculations are available:
 - `sum`: Sum of all values (numeric types, kcpu, kmem)
 - `min`: Minimum value (numeric types)
 - `max`: Maximum value (numeric types)
+- `avg`: Average value (numeric types)
 - `count`: Count of non-null values (all types)
 - `unique`: Count of unique values (all types)
 - `none`: No summary (default)
@@ -467,7 +468,11 @@ draw_table layout.json data.json
    - Very large datasets may cause performance issues
    - Consider limiting data or pre-filtering for large datasets
 
-6. **Color Compatibility**:
+6. **Testing**:
+   - The project includes an extensive suite of test scripts to ensure reliability
+   - These tests cover various scenarios and edge cases for robust functionality
+
+7. **Color Compatibility**:
    - The colored output uses ANSI escape sequences which work in most terminals
    - For environments without color support, consider piping through `cat -A` to see escape sequences
 

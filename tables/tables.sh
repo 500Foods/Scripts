@@ -88,11 +88,13 @@ EOF
 # calculate_title_width: Calculate the width needed for the title
 # Returns: width of the title section
 calculate_title_width() {
-    local title="$1" total_table_width="$2"
+    local title="$1"
+    local total_table_width="$2"
     
     if [[ -n "$title" ]]; then
         # Evaluate any embedded commands in the title
-        local evaluated_title=$(eval "echo \"$title\"")
+        local evaluated_title
+        evaluated_title=$(eval "echo \"$title\"")
         if [[ "$TITLE_POSITION" == "none" ]]; then
             TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING)))
         elif [[ "$TITLE_POSITION" == "full" ]]; then
@@ -109,11 +111,13 @@ calculate_title_width() {
 # calculate_footer_width: Calculate the width needed for the footer
 # Returns: width of the footer section
 calculate_footer_width() {
-    local footer="$1" total_table_width="$2"
+    local footer="$1"
+    local total_table_width="$2"
     
     if [[ -n "$footer" ]]; then
         # Evaluate any embedded commands in the footer
-        local evaluated_footer=$(eval "echo \"$footer\"")
+        local evaluated_footer
+        evaluated_footer=$(eval "echo \"$footer\"")
         if [[ "$FOOTER_POSITION" == "none" ]]; then
             FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING)))
         elif [[ "$FOOTER_POSITION" == "full" ]]; then

@@ -22,7 +22,8 @@ These scripts help with date and time operations:
 
 These scripts help format and display data in terminal-friendly tables:
 
-- [Tables](https://github.com/500Foods/Scripts/blob/main/tables/tables.md) - Render JSON data as customizable ASCII tables with themes, data formatting, and totals (BASH)
+- [Tables](https://github.com/500Foods/Scripts/blob/main/tables/tables.md) - Render JSON data as customizable ANSI tables with themes, data formatting, and totals (BASH)
+- [Tables Developer Guide](https://github.com/500Foods/Scripts/blob/main/tables/tables_developer.md) - Technical documentation for developers extending the Tables utility (BASH)
 
 ## Kubernetes
 

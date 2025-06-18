@@ -19,20 +19,20 @@ The script follows a modular design with clearly defined functions for each comp
 
 ```directory
 tables/
-├── tables.sh                    # Main script and entry point
+├── [tables.sh](tables.sh)                    # Main script and entry point
 ├── lib/
-│   ├── tables_config.sh         # Configuration parsing and validation
-│   ├── tables_data.sh           # Data processing pipeline
-│   ├── tables_datatypes.sh      # Data type system
-│   ├── tables_render.sh         # Table rendering system
-│   └── tables_themes.sh         # Theme definitions
+│   ├── [tables_config.sh](lib/tables_config.sh)         # Configuration parsing and validation
+│   ├── [tables_data.sh](lib/tables_data.sh)           # Data processing pipeline
+│   ├── [tables_datatypes.sh](lib/tables_datatypes.sh)      # Data type system
+│   ├── [tables_render.sh](lib/tables_render.sh)         # Table rendering system
+│   └── [tables_themes.sh](lib/tables_themes.sh)         # Theme definitions
 ├── tst/                         # Test files
-│   ├── tables_test_01_basic.sh
-│   ├── tables_test_03_titles.sh
-│   ├── tables_test_05_footers.sh
+│   ├── [tables_test_01_basic.sh](tst/tables_test_01_basic.sh)
+│   ├── [tables_test_03_titles.sh](tst/tables_test_03_titles.sh)
+│   ├── [tables_test_05_footers.sh](tst/tables_test_05_footers.sh)
 │   └── ...
-├── tables.md                    # User documentation
-└── tables_developer.md         # This file
+├── [tables.md](tables.md)                    # User documentation
+└── [tables_developer.md](tables_developer.md)         # This file
 ```
 
 ## Core Components and Flow
@@ -334,6 +334,7 @@ The system supports several summary types:
 - **sum**: Arithmetic sum of numeric values
 - **min**: Minimum value
 - **max**: Maximum value
+- **avg**: Average value of numeric data
 - **count**: Count of non-null values
 - **unique**: Count of unique values
 
@@ -600,11 +601,17 @@ Debug messages are sent to stderr and include:
 
 ### Test Framework
 
-The `tst/` directory contains test files that demonstrate various features:
+The `tst/` directory contains an extensive suite of test files that demonstrate various features and ensure reliability:
 
-- `tables_test_01_basic.sh`: Basic functionality tests
-- `tables_test_03_titles.sh`: Title positioning tests
-- `tables_test_05_footers.sh`: Footer positioning tests
+- [`tables_test_01_basic.sh`](tst/tables_test_01_basic.sh): Basic functionality tests
+- [`tables_test_02_summary.sh`](tst/tables_test_02_summary.sh): Summary calculation tests
+- [`tables_test_03_wrapping.sh`](tst/tables_test_03_wrapping.sh): Text wrapping functionality tests
+- [`tables_test_04_complex.sh`](tst/tables_test_04_complex.sh): Complex table rendering tests
+- [`tables_test_05_titles.sh`](tst/tables_test_05_titles.sh): Title positioning tests
+- [`tables_test_06_title_positions.sh`](tst/tables_test_06_title_positions.sh): Additional title positioning scenarios
+- [`tables_test_07_footers.sh`](tst/tables_test_07_footers.sh): Footer functionality tests
+- [`tables_test_08_footer_positions.sh`](tst/tables_test_08_footer_positions.sh): Additional footer positioning scenarios
+- [`tables_test_09_showcase.sh`](tst/tables_test_09_showcase.sh): Comprehensive feature showcase
 
 ### Creating Test Cases
 
@@ -655,8 +662,9 @@ test_new_feature() {
 
 ## Version History
 
+- **1.1.0**: Added Avg summary type, enhanced wrap functionality, expanded datatype support for summaries, increased test coverage, and passed shellcheck with no errors or warnings
 - **1.0.2**: Added help functionality and version history section
 - **1.0.1**: Fixed shellcheck issues (SC2004, SC2155)
 - **1.0.0**: Initial release with table rendering functionality
 
-The current implementation includes title/footer support, enhanced theming, the `num` datatype with thousands separators, and comprehensive summary calculations.
+The current implementation includes title/footer support, enhanced theming, the `num` datatype with thousands separators, comprehensive summary calculations including averages, and advanced text wrapping options.

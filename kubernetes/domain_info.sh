@@ -318,7 +318,7 @@ get_application_workloads() {
 {
   "theme": "$TABLE_THEME",
   "title": "Application Workloads",
-  "footer": "kubectl get pods -n <namespace> -l <selector> -o json",
+  "footer": "kubectl get pods -o json",
   "footer_position": "right",
   "columns": [
     {
@@ -744,7 +744,7 @@ check_system_health() {
 {
   "theme": "$TABLE_THEME",
   "title": "System Health Check",
-  "footer": "kubectl get pods -n <namespace> -o json",
+  "footer": "kubectl get pods -o json",
   "footer_position": "right",
   "columns": [
     {

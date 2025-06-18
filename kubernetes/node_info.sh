@@ -222,7 +222,7 @@ get_node_info() {
 {
   "theme": "$TABLE_THEME",
   "title": "A: Nodes Overview",
-  "footer": "kubectl get nodes -o json + doctl compute droplet get <node-name>",
+  "footer": "kubectl get nodes -o json + doctl compute droplet get",
   "footer_position": "right",
   "columns": [
     {
@@ -549,7 +549,7 @@ EOF
 {
   "theme": "$TABLE_THEME",
   "title": "C: Pods on Node $node_name",
-  "footer": "kubectl get pods -A -o json | filter by nodeName",
+  "footer": "kubectl get pods -A -o json",
   "footer_position": "right",
   "columns": [
     {
