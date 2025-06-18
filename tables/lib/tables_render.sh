@@ -524,15 +524,31 @@ render_data_rows() {
             printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
             for ((j=0; j<COLUMN_COUNT; j++)); do
                 local display_value="${line_values[$j,$line]:-}"
+                local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
+                
+                # Clip the display value if it exceeds the content width and a width is specified
+                if [[ ${#display_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                    case "${JUSTIFICATIONS[$j]}" in
+                        right)
+                            display_value="${display_value: -$content_width}"
+                            ;;
+                        center)
+                            local excess=$(( ${#display_value} - content_width ))
+                            local left_clip=$(( excess / 2 ))
+                            display_value="${display_value:$left_clip:$content_width}"
+                            ;;
+                        *)
+                            display_value="${display_value:0:$content_width}"
+                            ;;
+                    esac
+                fi
                 
                 case "${JUSTIFICATIONS[$j]}" in
                     right)
-                        local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
                         printf "%*s%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                               "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
                         ;;
                     center)
-                        local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
                         if [[ -z "$display_value" ]]; then
                             printf "%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                                   "${PADDINGS[j]}" "" "$((WIDTHS[j] - (2 * PADDINGS[j]) + PADDINGS[j]))" ""
@@ -546,7 +562,7 @@ render_data_rows() {
                         ;;
                     *)
                         printf "%*s%-*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                              "${PADDINGS[j]}" "" "$((WIDTHS[j] - (2 * PADDINGS[j])))" "$display_value" "${PADDINGS[j]}" ""
+                              "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
                         ;;
                 esac
             done
@@ -737,15 +753,30 @@ render_summaries_row() {
                     ;;
             esac
             
-            # Use summary_color for all summary values
+            # Use summary_color for all summary values and clip if necessary based on whether width is specified
+            local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
+            if [[ ${#summary_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
+                case "${JUSTIFICATIONS[$i]}" in
+                    right)
+                        summary_value="${summary_value: -$content_width}"
+                        ;;
+                    center)
+                        local excess=$(( ${#summary_value} - content_width ))
+                        local left_clip=$(( excess / 2 ))
+                        summary_value="${summary_value:$left_clip:$content_width}"
+                        ;;
+                    *)
+                        summary_value="${summary_value:0:$content_width}"
+                        ;;
+                esac
+            fi
+            
             case "${JUSTIFICATIONS[$i]}" in
                 right)
-                    local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
                     printf "%*s${THEME[summary_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
                           "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
                     ;;
                 center)
-                    local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
                     local value_spaces=$(( (content_width - ${#summary_value}) / 2 ))
                     local left_spaces=$(( PADDINGS[i] + value_spaces ))
                     local right_spaces=$(( PADDINGS[i] + content_width - ${#summary_value} - value_spaces ))
@@ -754,7 +785,7 @@ render_summaries_row() {
                     ;;
                 *)
                     printf "%*s${THEME[summary_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${PADDINGS[i]}" "" "$((WIDTHS[i] - (2 * PADDINGS[i])))" "$summary_value" "${PADDINGS[i]}" ""
+                          "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
                     ;;
             esac
         done

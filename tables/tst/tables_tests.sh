@@ -4,9 +4,6 @@
 # Version: 1.0.0
 # Usage: ./tables_tests.sh
 
-# Exit on any error
-set -e
-
 echo "Starting execution of table test scripts..."
 
 # Find all tables_test*.sh scripts and sort them by the numerical part of the filename

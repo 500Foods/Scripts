@@ -12,6 +12,7 @@ declare -A MAX_SUMMARIES=()
 declare -A UNIQUE_VALUES=()
 declare -A AVG_SUMMARIES=()
 declare -A AVG_COUNTS=()
+declare -a IS_WIDTH_SPECIFIED=()
 
 # initialize_summaries: Initialize summaries storage
 initialize_summaries() {
@@ -187,7 +188,7 @@ process_data_rows() {
             fi
             
             # Do not update column width based on content if a width is specified in the layout
-            if [[ ${WIDTHS[j]} -eq $(( ${#HEADERS[j]} + (2 * PADDINGS[j]) )) ]]; then
+            if [[ "${IS_WIDTH_SPECIFIED[j]}" != "true" ]]; then
                 # No specified width in layout, adjust based on content
                 if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
                     local max_len=0
@@ -294,7 +295,7 @@ process_data_rows() {
             esac
             
             # If summary exists, check if its width requires column adjustment, but only if no width is specified in layout
-            if [[ -n "$summary_value" && ${WIDTHS[j]} -eq $(( ${#HEADERS[j]} + (2 * PADDINGS[j]) )) ]]; then
+            if [[ -n "$summary_value" && "${IS_WIDTH_SPECIFIED[j]}" != "true" ]]; then
                 local summary_len
                 summary_len=$(echo -n "$summary_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
                 local summary_padded_width=$((summary_len + (2 * PADDINGS[j])))

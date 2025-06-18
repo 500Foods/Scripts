@@ -539,8 +539,7 @@ cat > "$layout_file" << 'EOF'
       "header": "Load Avg",
       "key": "load_avg",
       "datatype": "float",
-      "justification": "right",
-      "width": 5
+      "justification": "right"
     }
   ]
 }

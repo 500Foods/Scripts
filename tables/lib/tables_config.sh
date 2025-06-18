@@ -29,6 +29,7 @@ declare -ax WIDTHS=()
 declare -ax SORT_KEYS=()
 declare -ax SORT_DIRECTIONS=()
 declare -ax SORT_PRIORITIES=()
+declare -ax IS_WIDTH_SPECIFIED=()
 
 # validate_input_files: Check if layout and data files exist and are valid
 # Args: layout_file, data_file
@@ -116,6 +117,7 @@ parse_column_config() {
     WRAP_MODES=()
     WRAP_CHARS=()
     WIDTHS=()
+    IS_WIDTH_SPECIFIED=()
     
     local column_count
     column_count=$(jq '. | length' <<<"$columns_json")
@@ -155,10 +157,14 @@ parse_column_config() {
         
         if [[ $specified_width -gt 0 ]]; then
             WIDTHS[i]=$specified_width
+            IS_WIDTH_SPECIFIED[i]="true"
+            debug_log "Width specified for column $i (${HEADERS[$i]}): ${WIDTHS[$i]}"
         else
             WIDTHS[i]=$((${#HEADERS[i]} + (2 * PADDINGS[i])))
+            IS_WIDTH_SPECIFIED[i]="false"
+            debug_log "Width not specified for column $i (${HEADERS[$i]}), using header length: ${WIDTHS[$i]}"
         fi
-        debug_log "Initial width for column $i (${HEADERS[$i]}): ${WIDTHS[$i]} (including padding ${PADDINGS[$i]})"
+        debug_log "Initial width for column $i (${HEADERS[$i]}): ${WIDTHS[$i]} (including padding ${PADDINGS[$i]}), Width specified: ${IS_WIDTH_SPECIFIED[$i]}"
     done
     
     # Debug verification of array contents
