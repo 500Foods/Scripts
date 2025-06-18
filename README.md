@@ -29,8 +29,8 @@ These scripts help format and display data in terminal-friendly tables:
 
 These scripts help manage and monitor Kubernetes clusters:
 
-- [Node Info](https://github.com/500Foods/Scripts/blob/main/kubernetes/nodeinfo.md) - Display detailed information about nodes and pods in a Kubernetes cluster (BASH)
-- [Domain Management](https://github.com/500Foods/Scripts/blob/main/kubernetes/dommgmt.md) - Audit ingress controllers and certificate manager configurations to identify mismatches (BASH)
+- [Node Info](https://github.com/500Foods/Scripts/blob/main/kubernetes/node_info.md) - Display detailed information about nodes and pods in a Kubernetes cluster (BASH)
+- [Domain Management](https://github.com/500Foods/Scripts/blob/main/kubernetes/domain_info.md) - Audit ingress controllers and certificate manager configurations to identify mismatches (BASH)
 
 ## PostgreSQL
 
@@ -42,7 +42,7 @@ These scripts help with PostgreSQL database operations:
 
 These tools help manage GitHub repositories:
 
-- [GitHubSync](https://github.com/500Foods/Scripts/blob/main/githubsync/githubsync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
+- [GitHubSync](https://github.com/500Foods/Scripts/blob/main/github-sync/github-sync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
 - [CLOC](https://github.com/500Foods/Scripts/blob/main/cloc/cloc.md) - Add "count lines of code" to the README.md of a GitHub repository (GitHub Action)
 
 ## Repository Information

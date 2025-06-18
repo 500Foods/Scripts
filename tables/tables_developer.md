@@ -19,20 +19,20 @@ The script follows a modular design with clearly defined functions for each comp
 
 ```directory
 tables/
-├── [tables.sh](tables.sh)                    # Main script and entry point
+├── tables.sh                    # Main script and entry point
 ├── lib/
-│   ├── [tables_config.sh](lib/tables_config.sh)         # Configuration parsing and validation
-│   ├── [tables_data.sh](lib/tables_data.sh)           # Data processing pipeline
-│   ├── [tables_datatypes.sh](lib/tables_datatypes.sh)      # Data type system
-│   ├── [tables_render.sh](lib/tables_render.sh)         # Table rendering system
-│   └── [tables_themes.sh](lib/tables_themes.sh)         # Theme definitions
+│   ├── tables_config.sh         # Configuration parsing and validation
+│   ├── tables_data.sh           # Data processing pipeline
+│   ├── tables_datatypes.sh      # Data type system
+│   ├── tables_render.sh         # Table rendering system
+│   └── tables_themes.sh         # Theme definitions
 ├── tst/                         # Test files
-│   ├── [tables_test_01_basic.sh](tst/tables_test_01_basic.sh)
-│   ├── [tables_test_03_titles.sh](tst/tables_test_03_titles.sh)
-│   ├── [tables_test_05_footers.sh](tst/tables_test_05_footers.sh)
+│   ├── tables_test_01_basic.sh
+│   ├── tables_test_03_titles.sh
+│   ├── tables_test_05_footers.sh
 │   └── ...
-├── [tables.md](tables.md)                    # User documentation
-└── [tables_developer.md](tables_developer.md)         # This file
+├── tables.md                    # User documentation
+└── tables_developer.md          # This file
 ```
 
 ## Core Components and Flow
@@ -85,6 +85,7 @@ The script uses several global variables and arrays to maintain state:
 - `WRAP_CHARS[]`: Characters used for wrapping
 - `PADDINGS[]`: Padding spaces for each column
 - `WIDTHS[]`: Calculated or specified column widths
+- `VISIBLES[]`: Whether to display the column (true/false for visibility)
 
 ### Sort Configuration
 
@@ -268,7 +269,7 @@ For each datatype, three entries are registered:
 3. **float**: Floating-point numbers
 4. **num**: Numbers with thousands separator formatting
 5. **kcpu**: Kubernetes CPU values (e.g., "100m")
-6. **kmem**: Kubernetes memory values (e.g., "128M", "1G")
+6. **kmem**: Kubernetes memory values (e.g., "128M")
 
 ### Adding a New Datatype
 
@@ -451,12 +452,16 @@ parse_column_config() {
         col_json=$(jq -c ".[$i]" <<<"$columns_json")
         HEADERS[i]=$(jq -r '.header // ""' <<<"$col_json")
         KEYS[i]=$(jq -r '.key // (.header | ascii_downcase | gsub("[^a-z0-9]"; "_"))' <<<"$col_json")
-        # ... process other column properties
+        # ... process other column properties including visibility
         
         validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
     done
 }
 ```
+
+#### Column Visibility Feature
+
+The configuration system supports a `visible` property for each column, stored in the `VISIBLES[]` array. Setting `"visible": false` in a column's JSON configuration excludes it from the rendered table output without affecting data processing. This feature is useful for including data needed for sorting or other operations while keeping it hidden from the final display. The rendering system ensures that hidden columns do not impact table layout or border calculations.
 
 ## Extension Examples
 
@@ -667,4 +672,4 @@ test_new_feature() {
 - **1.0.1**: Fixed shellcheck issues (SC2004, SC2155)
 - **1.0.0**: Initial release with table rendering functionality
 
-The current implementation includes title/footer support, enhanced theming, the `num` datatype with thousands separators, comprehensive summary calculations including averages, and advanced text wrapping options.
+The current implementation includes title/footer support, enhanced theming, the `num` datatype with thousands separators, comprehensive summary calculations including averages, advanced text wrapping options, and support for column visibility to hide specific columns from display.

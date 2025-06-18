@@ -69,6 +69,13 @@ cat > "$layout_file" << 'EOF'
       "justification": "right"
     },
     {
+      "header": "ID2",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right",
+      "visible": false
+    },
+    {
       "header": "Server Name", 
       "key": "name",
       "datatype": "text",
@@ -86,7 +93,8 @@ EOF
 
 echo "Test 1-A: Integer and Text datatypes with different justifications"
 echo "----------------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file"
+"$tables_script" "$layout_file" "$data_file" 
+
 
 # Test 1-B: Numeric datatypes - int, num, float (Theme: Blue)
 cat > "$layout_file" << 'EOF'

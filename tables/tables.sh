@@ -20,6 +20,7 @@
 declare -r TABLES_VERSION="1.0.2"
 
 # VERSION HISTORY
+# 1.0.3 - Visible: false columns are now excluded from width calculations
 # 1.0.2 - Added help functionality and version history section
 # 1.0.1 - Fixed shellcheck issues (SC2004, SC2155)
 # 1.0.0 - Initial release with table rendering functionality
@@ -132,13 +133,20 @@ calculate_footer_width() {
 }
 
 # calculate_table_width: Calculate the total width of the table
-# Returns: total width of the table in characters
+# Returns: total width of the table in characters, considering only visible columns
 calculate_table_width() {
     local width=0
+    local visible_count=0
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        ((width += WIDTHS[i]))
-        [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((width++))
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
+            ((width += WIDTHS[i]))
+            ((visible_count++))
+        fi
     done
+    # Add separators only between visible columns
+    if [[ $visible_count -gt 1 ]]; then
+        ((width += visible_count - 1))
+    fi
     echo "$width"
 }
 

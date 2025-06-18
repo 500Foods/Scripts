@@ -13,6 +13,7 @@ Tables.sh converts JSON data into beautifully formatted ANSI tables with the fol
 - Text wrapping and custom display options for null/zero values
 - Title and footer support with flexible positioning
 - Thousands separator formatting for numeric data
+- Option to hide specific columns using visibility settings
 
 ## Usage
 
@@ -76,7 +77,8 @@ The layout file defines how the table should be structured and formatted:
       "wrap_char": "",
       "padding": 1,
       "width": 0,
-      "format": ""
+      "format": "",
+      "visible": true
     }
   ]
 }
@@ -150,6 +152,11 @@ Each column in the `columns` array can have the following properties:
 | `padding` | Padding spaces on each side | `1` | Any integer |
 | `width` | Fixed column width | `0` (auto) | Any integer |
 | `format` | Custom format string | `""` | Format string |
+| `visible` | Whether to display the column | `true` | `true`, `false` |
+
+#### Visibility Option
+
+The `visible` property allows you to hide specific columns from the table output without removing them from the data processing. Setting `"visible": false` in a column's configuration will exclude that column from the rendered table, ensuring that it does not affect the layout or border calculations. This is useful for including data in the JSON that you might need for sorting or other processing but do not wish to display. In particular, this is useful for adding a custom break value, where the break value itself doesn't need to be visible. For example, in a file listing, a folder column could be present, but not shown, such that extra separator lines could be drawn between folders.
 
 ## Supported Data Types
 
@@ -401,6 +408,77 @@ This example demonstrates more features, including titles, footers, sorting, and
 }
 ```
 
+### Example with Hidden Column
+
+This example shows how to use the `visible: false` property to hide a column from display while still processing its data:
+
+**Layout JSON:**
+
+```json
+{
+  "theme": "Red",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "justification": "right",
+      "datatype": "int"
+    },
+    {
+      "header": "Hidden Data",
+      "key": "hidden_data",
+      "justification": "left",
+      "datatype": "text",
+      "visible": false
+    },
+    {
+      "header": "Server Name",
+      "key": "name",
+      "justification": "left",
+      "datatype": "text"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "justification": "center",
+      "datatype": "text"
+    }
+  ]
+}
+```
+
+**Data JSON:**
+
+```json
+[
+  {
+    "id": 1,
+    "hidden_data": "secret-info-1",
+    "name": "web-server-01",
+    "status": "Running"
+  },
+  {
+    "id": 2,
+    "hidden_data": "secret-info-2",
+    "name": "db-server-01",
+    "status": "Running"
+  }
+]
+```
+
+**Output:**
+
+```table
+╭────┬───────────────┬──────────╮
+│ ID │ Server Name   │  Status  │
+├────┼───────────────┼──────────┤
+│  1 │ web-server-01 │ Running  │
+│  2 │ db-server-01  │ Running  │
+╰────┴───────────────┴──────────╯
+```
+
+In this example, the "Hidden Data" column is not displayed in the table output, even though the data is present in the JSON file.
+
 ## Using in Scripts
 
 You can source tables.sh in your own scripts to use its functions:
@@ -464,15 +542,19 @@ draw_table layout.json data.json
    - Consider table width when designing titles and footers
    - Use `"full"` position for titles/footers that should span the entire table width
 
-5. **Performance**:
+5. **Column Visibility**:
+   - Use `visible: false` to hide columns that contain data needed for processing (like sorting) but should not be displayed
+   - Hidden columns do not affect the table layout or border rendering
+
+6. **Performance**:
    - Very large datasets may cause performance issues
    - Consider limiting data or pre-filtering for large datasets
 
-6. **Testing**:
+7. **Testing**:
    - The project includes an extensive suite of test scripts to ensure reliability
    - These tests cover various scenarios and edge cases for robust functionality
 
-7. **Color Compatibility**:
+8. **Color Compatibility**:
    - The colored output uses ANSI escape sequences which work in most terminals
    - For environments without color support, consider piping through `cat -A` to see escape sequences
 

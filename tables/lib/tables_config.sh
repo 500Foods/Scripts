@@ -30,6 +30,7 @@ declare -ax SORT_KEYS=()
 declare -ax SORT_DIRECTIONS=()
 declare -ax SORT_PRIORITIES=()
 declare -ax IS_WIDTH_SPECIFIED=()
+declare -ax VISIBLES=()
 
 # validate_input_files: Check if layout and data files exist and are valid
 # Args: layout_file, data_file
@@ -118,6 +119,7 @@ parse_column_config() {
     WRAP_CHARS=()
     WIDTHS=()
     IS_WIDTH_SPECIFIED=()
+    VISIBLES=()
     
     local column_count
     column_count=$(jq '. | length' <<<"$columns_json")
@@ -129,6 +131,7 @@ parse_column_config() {
     for ((i=0; i<column_count; i++)); do
         local col_json
         col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        debug_log "Column $i: Full JSON content: $col_json"
         HEADERS[i]=$(jq -r '.header // ""' <<<"$col_json")
         KEYS[i]=$(jq -r '.key // (.header | ascii_downcase | gsub("[^a-z0-9]"; "_"))' <<<"$col_json")
         JUSTIFICATIONS[i]=$(jq -r '.justification // "left"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
@@ -142,8 +145,20 @@ parse_column_config() {
         WRAP_MODES[i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         WRAP_CHARS[i]=$(jq -r '.wrap_char // ""' <<<"$col_json")
         PADDINGS[i]=$(jq -r '.padding // '"$DEFAULT_PADDING" <<<"$col_json")
+        local visible_raw=$(jq -r '.visible // true' <<<"$col_json")
+        debug_log "Column $i: Raw visible value from JSON: $visible_raw"
+        # Check if visible key exists in JSON to debug potential mismatch
+        local visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
+        debug_log "Column $i: Does 'visible' key exist in JSON? $visible_key_check"
+        if [[ "$visible_key_check" == "true" ]]; then
+            local visible_value=$(jq -r '.visible' <<<"$col_json")
+            debug_log "Column $i: Explicit visible value (if key exists): $visible_value"
+            VISIBLES[i]="$visible_value"
+        else
+            VISIBLES[i]="$visible_raw"
+        fi
         
-        debug_log "Column $i: Header=${HEADERS[$i]}, Key=${KEYS[$i]}, Datatype=${DATATYPES[$i]}"
+        debug_log "Column $i: Header=${HEADERS[$i]}, Key=${KEYS[$i]}, Datatype=${DATATYPES[$i]}, Visible=${VISIBLES[$i]}"
         
         validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
     done
@@ -171,6 +186,7 @@ parse_column_config() {
     debug_log "After parse_column_config - Number of columns: $COLUMN_COUNT"
     debug_log "After parse_column_config - Headers: ${HEADERS[*]}"
     debug_log "After parse_column_config - Keys: ${KEYS[*]}"
+    debug_log "After parse_column_config - Visibles: ${VISIBLES[*]}"
 }
 
 # validate_column_config: Validate column configuration and print warnings

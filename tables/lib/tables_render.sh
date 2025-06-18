@@ -115,16 +115,30 @@ render_table_border() {
     
     debug_log "Rendering $border_type border with total width: $total_table_width, element offset: $element_offset, element right edge: $element_right_edge, element width: $element_width"
     
-    # Calculate positions of all column separators
+    # Calculate positions of all column separators for visible columns
     local column_widths_sum=0
     local column_positions=()
     for ((i=0; i<COLUMN_COUNT-1; i++)); do
-        column_widths_sum=$((column_widths_sum + WIDTHS[i]))
-        column_positions+=("$column_widths_sum")
-        ((column_widths_sum++))  # +1 for the separator
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
+            column_widths_sum=$((column_widths_sum + WIDTHS[i]))
+            # Check if there are any more visible columns after this one
+            local has_more_visible=false
+            for ((j=$((i+1)); j<COLUMN_COUNT; j++)); do
+                if [[ "${VISIBLES[j]}" == "true" ]]; then
+                    has_more_visible=true
+                    break
+                fi
+            done
+            if [[ "$has_more_visible" == "true" ]]; then
+                column_positions+=("$column_widths_sum")
+                ((column_widths_sum++))  # +1 for the separator
+            fi
+        fi
     done
+    # Ensure the column positions are correctly aligned for border rendering
+    debug_log "Column positions for separators: ${column_positions[*]}"
     
-    # Determine maximum width to render (longer of table width or element width if present)
+    # Determine maximum width to render (should match the table width considering only visible columns)
     # Add 2 to account for left and right border characters
     local max_width=$((total_table_width + 2))
     if [[ -n "$element_width" && $element_width -gt 0 ]]; then
@@ -133,6 +147,11 @@ render_table_border() {
         if [[ $adjusted_element_width -gt $max_width ]]; then
             max_width=$adjusted_element_width
         fi
+    fi
+    # Ensure max_width does not exceed the width of visible content plus borders
+    local visible_content_width=$((total_table_width + 2))
+    if [[ $max_width -gt $visible_content_width ]]; then
+        max_width=$visible_content_width
     fi
     
     debug_log "Max width for $border_type border: $max_width"
@@ -287,10 +306,16 @@ render_table_top_border() {
     debug_log "Rendering top border"
     
     local total_table_width=0
+    local visible_count=0
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        ((total_table_width += WIDTHS[i]))
-        [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((total_table_width++))
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
+            ((total_table_width += WIDTHS[i]))
+            ((visible_count++))
+        fi
     done
+    if [[ $visible_count -gt 1 ]]; then
+        ((total_table_width += visible_count - 1))
+    fi
     
     local title_offset=0
     local title_right_edge=0
@@ -316,10 +341,16 @@ render_table_bottom_border() {
     debug_log "Rendering bottom border"
     
     local total_table_width=0
-        for ((i=0; i<COLUMN_COUNT; i++)); do
+    local visible_count=0
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
             ((total_table_width += WIDTHS[i]))
-        [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((total_table_width++))
+            ((visible_count++))
+        fi
     done
+    if [[ $visible_count -gt 1 ]]; then
+        ((total_table_width += visible_count - 1))
+    fi
     
     local footer_offset=0
     local footer_right_edge=0
@@ -349,45 +380,46 @@ render_table_headers() {
     
     printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        debug_log "Rendering header $i: ${HEADERS[$i]}, width=${WIDTHS[$i]}, justification=${JUSTIFICATIONS[$i]}"
-        local header_text="${HEADERS[$i]}"
-        local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
-        if [[ ${#header_text} -gt $content_width ]]; then
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
+            debug_log "Rendering header $i: ${HEADERS[$i]}, width=${WIDTHS[$i]}, justification=${JUSTIFICATIONS[$i]}"
+            local header_text="${HEADERS[$i]}"
+            local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
+            if [[ ${#header_text} -gt $content_width ]]; then
+                case "${JUSTIFICATIONS[$i]}" in
+                    right)
+                        header_text="${header_text: -${content_width}}"
+                        ;;
+                    center)
+                        local excess=$(( ${#header_text} - content_width ))
+                        local left_clip=$(( excess / 2 ))
+                        header_text="${header_text:${left_clip}:${content_width}}"
+                        ;;
+                    *)
+                        header_text="${header_text:0:${content_width}}"
+                        ;;
+                esac
+            fi
+            
             case "${JUSTIFICATIONS[$i]}" in
                 right)
-                    header_text="${header_text: -${content_width}}"
+                    printf "%*s${THEME[caption_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
                     ;;
                 center)
-                    local excess=$(( ${#header_text} - content_width ))
-                    local left_clip=$(( excess / 2 ))
-                    header_text="${header_text:${left_clip}:${content_width}}"
+                    local header_spaces=$(( (content_width - ${#header_text}) / 2 ))
+                    local left_spaces=$(( PADDINGS[i] + header_spaces ))
+                    local right_spaces=$(( PADDINGS[i] + content_width - ${#header_text} - header_spaces ))
+                    printf "%*s${THEME[caption_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${left_spaces}" "" "${header_text}" "${right_spaces}" ""
                     ;;
                 *)
-                    header_text="${header_text:0:${content_width}}"
+                    printf "%*s${THEME[caption_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                          "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
                     ;;
             esac
         fi
-        
-        case "${JUSTIFICATIONS[$i]}" in
-            right)
-                printf "%*s${THEME[caption_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
-                ;;
-            center)
-                local header_spaces=$(( (content_width - ${#header_text}) / 2 ))
-                local left_spaces=$(( PADDINGS[i] + header_spaces ))
-                local right_spaces=$(( PADDINGS[i] + content_width - ${#header_text} - header_spaces ))
-                printf "%*s${THEME[caption_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${left_spaces}" "" "${header_text}" "${right_spaces}" ""
-                ;;
-            *)
-                printf "%*s${THEME[caption_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
-                ;;
-        esac
     done
-    printf "
-"
+    printf "\n"
 }
 
 # render_table_separator: Render a separator line in the table
@@ -400,11 +432,28 @@ render_table_separator() {
     
     printf "${THEME[border_color]}%s" "${left_char}"
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        local width=${WIDTHS[i]}
-        for ((j=0; j<width; j++)); do
-            printf "%s" "${THEME[h_line]}"
-        done
-        [[ $i -lt $((COLUMN_COUNT-1)) ]] && printf "%s" "${middle_char}"
+        if [[ "${VISIBLES[i]}" == "true" ]]; then
+            local width=${WIDTHS[i]}
+            debug_log "Rendering separator for visible column $i with width $width"
+            for ((j=0; j<width; j++)); do
+                printf "%s" "${THEME[h_line]}"
+            done
+            if [[ $i -lt $((COLUMN_COUNT-1)) ]]; then
+                local next_visible=false
+                for ((k=$((i+1)); k<COLUMN_COUNT; k++)); do
+                    if [[ "${VISIBLES[k]}" == "true" ]]; then
+                        next_visible=true
+                        break
+                    fi
+                done
+                if [[ "$next_visible" == "true" ]]; then
+                    printf "%s" "${middle_char}"
+                    debug_log "Placed separator after column $i"
+                fi
+            fi
+        else
+            debug_log "Skipping hidden column $i"
+        fi
     done
     printf "%s${THEME[text_color]}\n" "${right_char}"
 }
@@ -417,8 +466,8 @@ render_data_rows() {
     
     # Initialize last break values
     local last_break_values=()
-        for ((j=0; j<COLUMN_COUNT; j++)); do
-            last_break_values[j]=""
+    for ((j=0; j<COLUMN_COUNT; j++)); do
+        last_break_values[j]=""
     done
     
     # Process each row in order
@@ -524,51 +573,52 @@ render_data_rows() {
         for ((line=0; line<row_line_count; line++)); do
             printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
             for ((j=0; j<COLUMN_COUNT; j++)); do
-                local display_value="${line_values[$j,$line]:-}"
-                local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
-                
-                # Clip the display value if it exceeds the content width and a width is specified
-                if [[ ${#display_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                if [[ "${VISIBLES[j]}" == "true" ]]; then
+                    local display_value="${line_values[$j,$line]:-}"
+                    local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
+                    
+                    # Clip the display value if it exceeds the content width and a width is specified
+                    if [[ ${#display_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                        case "${JUSTIFICATIONS[$j]}" in
+                            right)
+                                display_value="${display_value: -$content_width}"
+                                ;;
+                            center)
+                                local excess=$(( ${#display_value} - content_width ))
+                                local left_clip=$(( excess / 2 ))
+                                display_value="${display_value:$left_clip:$content_width}"
+                                ;;
+                            *)
+                                display_value="${display_value:0:$content_width}"
+                                ;;
+                        esac
+                    fi
+                    
                     case "${JUSTIFICATIONS[$j]}" in
                         right)
-                            display_value="${display_value: -$content_width}"
+                            printf "%*s%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                                  "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
                             ;;
                         center)
-                            local excess=$(( ${#display_value} - content_width ))
-                            local left_clip=$(( excess / 2 ))
-                            display_value="${display_value:$left_clip:$content_width}"
+                            if [[ -z "$display_value" ]]; then
+                                printf "%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                                      "${PADDINGS[j]}" "" "$((WIDTHS[j] - (2 * PADDINGS[j]) + PADDINGS[j]))" ""
+                            else
+                                local value_spaces=$(( (content_width - ${#display_value}) / 2 ))
+                                local left_spaces=$(( PADDINGS[j] + value_spaces ))
+                                local right_spaces=$(( PADDINGS[j] + content_width - ${#display_value} - value_spaces ))
+                                printf "%*s%s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                                      "${left_spaces}" "" "$display_value" "${right_spaces}" ""
+                            fi
                             ;;
                         *)
-                            display_value="${display_value:0:$content_width}"
+                            printf "%*s%-*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                                  "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
                             ;;
                     esac
                 fi
-                
-                case "${JUSTIFICATIONS[$j]}" in
-                    right)
-                        printf "%*s%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                              "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
-                        ;;
-                    center)
-                        if [[ -z "$display_value" ]]; then
-                            printf "%*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                                  "${PADDINGS[j]}" "" "$((WIDTHS[j] - (2 * PADDINGS[j]) + PADDINGS[j]))" ""
-                        else
-                            local value_spaces=$(( (content_width - ${#display_value}) / 2 ))
-                            local left_spaces=$(( PADDINGS[j] + value_spaces ))
-                            local right_spaces=$(( PADDINGS[j] + content_width - ${#display_value} - value_spaces ))
-                            printf "%*s%s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                                  "${left_spaces}" "" "$display_value" "${right_spaces}" ""
-                        fi
-                        ;;
-                    *)
-                        printf "%*s%-*s%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                              "${PADDINGS[j]}" "" "${content_width}" "$display_value" "${PADDINGS[j]}" ""
-                        ;;
-                esac
             done
-            printf "
-"
+            printf "\n"
         done
         
         # Update break values for the next iteration
@@ -658,8 +708,7 @@ render_table_footer() {
                 ;;
         esac
         
-        printf "
-"
+        printf "\n"
         
         # Render footer bottom border
         if [[ $footer_offset -gt 0 ]]; then
@@ -689,110 +738,110 @@ render_summaries_row() {
         
         printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
         for ((i=0; i<COLUMN_COUNT; i++)); do
-            local summary_value="" datatype="${DATATYPES[$i]}" format="${FORMATS[$i]}"
-            case "${SUMMARIES[$i]}" in
-                sum)
-                    if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
-                        if [[ "$datatype" == "kcpu" ]]; then
-                            local formatted_num
-                            formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
-                            summary_value="${formatted_num}m"
-                        elif [[ "$datatype" == "kmem" ]]; then
-                            local formatted_num
-                            formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
-                            summary_value="${formatted_num}M"
-                        elif [[ "$datatype" == "num" ]]; then
-                            summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
-                        elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
-                            summary_value="${SUM_SUMMARIES[$i]}"
-                            [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                        fi
-                    fi
-                    ;;
-                min)
-                    summary_value="${MIN_SUMMARIES[$i]:-}"
-                    [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                    ;;
-                max)
-                    summary_value="${MAX_SUMMARIES[$i]:-}"
-                    [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                    ;;
-                count)
-                    summary_value="${COUNT_SUMMARIES[$i]:-0}"
-                    ;;
-                unique)
-                    if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
-                        summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '
-' | sort -u | wc -l | awk '{print $1}')
-                    else
-                        summary_value="0"
-                    fi
-                    ;;
-                avg)
-                    if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
-                        local avg_result
-                        avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}}")
-                        
-                        # Format based on datatype
-                        if [[ "$datatype" == "int" ]]; then
-                            summary_value=$(printf "%.0f" "$avg_result")
-                        elif [[ "$datatype" == "float" ]]; then
-                            # Use same decimal precision as format if available, otherwise 2 decimals
-                            if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then
-                                local decimals="${BASH_REMATCH[1]}"
-                                summary_value=$(printf "%.${decimals}f" "$avg_result")
-                            else
-                                summary_value=$(printf "%.2f" "$avg_result")
+            if [[ "${VISIBLES[i]}" == "true" ]]; then
+                local summary_value="" datatype="${DATATYPES[$i]}" format="${FORMATS[$i]}"
+                case "${SUMMARIES[$i]}" in
+                    sum)
+                        if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
+                            if [[ "$datatype" == "kcpu" ]]; then
+                                local formatted_num
+                                formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                                summary_value="${formatted_num}m"
+                            elif [[ "$datatype" == "kmem" ]]; then
+                                local formatted_num
+                                formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                                summary_value="${formatted_num}M"
+                            elif [[ "$datatype" == "num" ]]; then
+                                summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
+                            elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
+                                summary_value="${SUM_SUMMARIES[$i]}"
+                                [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
                             fi
-                        elif [[ "$datatype" == "num" ]]; then
-                            summary_value=$(format_num "$avg_result" "$format")
-                        else
-                            summary_value="$avg_result"
                         fi
-                    else
-                        summary_value="0"
-                    fi
-                    ;;
-            esac
-            
-            # Use summary_color for all summary values and clip if necessary based on whether width is specified
-            local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
-            if [[ ${#summary_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
+                        ;;
+                    min)
+                        summary_value="${MIN_SUMMARIES[$i]:-}"
+                        [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        ;;
+                    max)
+                        summary_value="${MAX_SUMMARIES[$i]:-}"
+                        [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        ;;
+                    count)
+                        summary_value="${COUNT_SUMMARIES[$i]:-0}"
+                        ;;
+                    unique)
+                        if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
+                            summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}')
+                        else
+                            summary_value="0"
+                        fi
+                        ;;
+                    avg)
+                        if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
+                            local avg_result
+                            avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}}")
+                            
+                            # Format based on datatype
+                            if [[ "$datatype" == "int" ]]; then
+                                summary_value=$(printf "%.0f" "$avg_result")
+                            elif [[ "$datatype" == "float" ]]; then
+                                # Use same decimal precision as format if available, otherwise 2 decimals
+                                if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then
+                                    local decimals="${BASH_REMATCH[1]}"
+                                    summary_value=$(printf "%.${decimals}f" "$avg_result")
+                                else
+                                    summary_value=$(printf "%.2f" "$avg_result")
+                                fi
+                            elif [[ "$datatype" == "num" ]]; then
+                                summary_value=$(format_num "$avg_result" "$format")
+                            else
+                                summary_value="$avg_result"
+                            fi
+                        else
+                            summary_value="0"
+                        fi
+                        ;;
+                esac
+                
+                # Use summary_color for all summary values and clip if necessary based on whether width is specified
+                local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
+                if [[ ${#summary_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
+                    case "${JUSTIFICATIONS[$i]}" in
+                        right)
+                            summary_value="${summary_value: -$content_width}"
+                            ;;
+                        center)
+                            local excess=$(( ${#summary_value} - content_width ))
+                            local left_clip=$(( excess / 2 ))
+                            summary_value="${summary_value:$left_clip:$content_width}"
+                            ;;
+                        *)
+                            summary_value="${summary_value:0:$content_width}"
+                            ;;
+                    esac
+                fi
+                
                 case "${JUSTIFICATIONS[$i]}" in
                     right)
-                        summary_value="${summary_value: -$content_width}"
+                        printf "%*s${THEME[summary_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                              "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
                         ;;
                     center)
-                        local excess=$(( ${#summary_value} - content_width ))
-                        local left_clip=$(( excess / 2 ))
-                        summary_value="${summary_value:$left_clip:$content_width}"
+                        local value_spaces=$(( (content_width - ${#summary_value}) / 2 ))
+                        local left_spaces=$(( PADDINGS[i] + value_spaces ))
+                        local right_spaces=$(( PADDINGS[i] + content_width - ${#summary_value} - value_spaces ))
+                        printf "%*s${THEME[summary_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                              "${left_spaces}" "" "$summary_value" "${right_spaces}" ""
                         ;;
                     *)
-                        summary_value="${summary_value:0:$content_width}"
+                        printf "%*s${THEME[summary_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+                              "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
                         ;;
                 esac
             fi
-            
-            case "${JUSTIFICATIONS[$i]}" in
-                right)
-                    printf "%*s${THEME[summary_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
-                    ;;
-                center)
-                    local value_spaces=$(( (content_width - ${#summary_value}) / 2 ))
-                    local left_spaces=$(( PADDINGS[i] + value_spaces ))
-                    local right_spaces=$(( PADDINGS[i] + content_width - ${#summary_value} - value_spaces ))
-                    printf "%*s${THEME[summary_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${left_spaces}" "" "$summary_value" "${right_spaces}" ""
-                    ;;
-                *)
-                    printf "%*s${THEME[summary_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                          "${PADDINGS[i]}" "" "${content_width}" "$summary_value" "${PADDINGS[i]}" ""
-                    ;;
-            esac
         done
-        printf "
-"
+        printf "\n"
         return 0
     fi
     
