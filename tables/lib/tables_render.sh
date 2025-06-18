@@ -10,7 +10,9 @@ render_table_title() {
     if [[ -n "$TABLE_TITLE" ]]; then
         # shellcheck disable=SC2153
         debug_log "Rendering table title: $TABLE_TITLE with position: $TITLE_POSITION"
-        calculate_title_width "$TABLE_TITLE" "$total_table_width"
+        # Evaluate any shell commands in the title before width calculation
+        local title_text=$(eval echo "$TABLE_TITLE" 2>/dev/null)
+        calculate_title_width "$title_text" "$total_table_width"
         
         local offset=0
         case "$TITLE_POSITION" in
@@ -38,11 +40,25 @@ render_table_title() {
         printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
         
         local available_width=$((TITLE_WIDTH - (2 * DEFAULT_PADDING)))
-        local title_text="$TABLE_TITLE"
         
-        # Clip text if it exceeds available width
-        if [[ ${#title_text} -gt $available_width ]]; then
-            title_text="${title_text:0:$available_width}"
+        # Clip text if it exceeds available width and a position (justification) is specified
+        if [[ ${#title_text} -gt $available_width && "$TITLE_POSITION" != "" ]]; then
+            case "$TITLE_POSITION" in
+                left)
+                    title_text="${title_text:0:$available_width}"
+                    ;;
+                right)
+                    title_text="${title_text: -$available_width}"
+                    ;;
+                center|full)
+                    local excess=$(( ${#title_text} - available_width ))
+                    local left_clip=$(( excess / 2 ))
+                    title_text="${title_text:$left_clip:$available_width}"
+                    ;;
+                *)
+                    title_text="${title_text:0:$available_width}"
+                    ;;
+            esac
         fi
         
         case "$TITLE_POSITION" in
@@ -258,7 +274,8 @@ render_table_border() {
             fi
         fi
         
-        printf "%s" "$char_to_print"
+        # Use direct output to ensure ANSI color codes are interpreted by the terminal
+        echo -ne "$char_to_print"
     done
     # shellcheck disable=SC2059
     printf "${THEME[text_color]}\n"
@@ -269,8 +286,8 @@ render_table_top_border() {
     debug_log "Rendering top border"
     
     local total_table_width=0
-        for ((i=0; i<COLUMN_COUNT; i++)); do
-            ((total_table_width += WIDTHS[i]))
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        ((total_table_width += WIDTHS[i]))
         [[ $i -lt $((COLUMN_COUNT-1)) ]] && ((total_table_width++))
     done
     
@@ -291,29 +308,6 @@ render_table_top_border() {
     fi
     
     render_table_border "top" "$total_table_width" "$title_offset" "$title_right_edge" "$title_width" "$title_position" "$([[ "$title_position" == "full" ]] && echo true || echo false)"
-    
-    # If title is full width, render the title text and a connecting line
-    if [[ -n "$TABLE_TITLE" && "$TITLE_POSITION" == "full" ]]; then
-        printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
-        
-        local available_width=$((total_table_width - (2 * DEFAULT_PADDING)))
-        local title_text="$TABLE_TITLE"
-        
-        if [[ ${#title_text} -gt $available_width ]]; then
-            title_text="${title_text:0:$available_width}"
-        fi
-        
-        local text_len=${#title_text}
-        local spaces=$(( (available_width - text_len) / 2 ))
-        local left_spaces=$(( DEFAULT_PADDING + spaces ))
-        local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces ))
-        printf "%*s${THEME[header_color]}%s${THEME[text_color]}%*s" \
-              "$left_spaces" "" "$title_text" "$right_spaces" ""
-        
-        printf "${THEME[border_color]}%s${THEME[text_color]}\n" "${THEME[v_line]}"
-        
-        render_table_border "top" "$total_table_width" "0" "$total_table_width" "$total_table_width" "full" "true"
-    fi
 }
 
 # render_table_bottom_border: Render the bottom border of the table
@@ -355,24 +349,39 @@ render_table_headers() {
     printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
     for ((i=0; i<COLUMN_COUNT; i++)); do
         debug_log "Rendering header $i: ${HEADERS[$i]}, width=${WIDTHS[$i]}, justification=${JUSTIFICATIONS[$i]}"
+        local header_text="${HEADERS[$i]}"
+        local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
+        if [[ ${#header_text} -gt $content_width ]]; then
+            case "${JUSTIFICATIONS[$i]}" in
+                right)
+                    header_text="${header_text: -${content_width}}"
+                    ;;
+                center)
+                    local excess=$(( ${#header_text} - content_width ))
+                    local left_clip=$(( excess / 2 ))
+                    header_text="${header_text:${left_clip}:${content_width}}"
+                    ;;
+                *)
+                    header_text="${header_text:0:${content_width}}"
+                    ;;
+            esac
+        fi
         
         case "${JUSTIFICATIONS[$i]}" in
             right)
-                local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
                 printf "%*s${THEME[caption_color]}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${PADDINGS[i]}" "" "${content_width}" "${HEADERS[i]}" "${PADDINGS[i]}" ""
+                      "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
                 ;;
             center)
-                local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
-                local header_spaces=$(( (content_width - ${#HEADERS[i]}) / 2 ))
+                local header_spaces=$(( (content_width - ${#header_text}) / 2 ))
                 local left_spaces=$(( PADDINGS[i] + header_spaces ))
-                local right_spaces=$(( PADDINGS[i] + content_width - ${#HEADERS[i]} - header_spaces ))
+                local right_spaces=$(( PADDINGS[i] + content_width - ${#header_text} - header_spaces ))
                 printf "%*s${THEME[caption_color]}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${left_spaces}" "" "${HEADERS[$i]}" "${right_spaces}" ""
+                      "${left_spaces}" "" "${header_text}" "${right_spaces}" ""
                 ;;
             *)
                 printf "%*s${THEME[caption_color]}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
-                      "${PADDINGS[i]}" "" "$((WIDTHS[i] - (2 * PADDINGS[i])))" "${HEADERS[i]}" "${PADDINGS[i]}" ""
+                      "${PADDINGS[i]}" "" "${content_width}" "${header_text}" "${PADDINGS[i]}" ""
                 ;;
         esac
     done
@@ -447,10 +456,65 @@ render_data_rows() {
                 local IFS="${WRAP_CHARS[$j]}"
                 read -ra parts <<<"$display_value"
                 for k in "${!parts[@]}"; do
-                    line_values[$j,$k]="${parts[k]}"
+                    local part="${parts[k]}"
+                    local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
+                    if [[ ${#part} -gt $content_width ]]; then
+                        case "${JUSTIFICATIONS[$j]}" in
+                            right)
+                                part="${part: -${content_width}}"
+                                ;;
+                            center)
+                                local excess=$(( ${#part} - content_width ))
+                                local left_clip=$(( excess / 2 ))
+                                part="${part:${left_clip}:${content_width}}"
+                                ;;
+                            *)
+                                part="${part:0:${content_width}}"
+                                ;;
+                        esac
+                    fi
+                    line_values[$j,$k]="$part"
                 done
                 [[ ${#parts[@]} -gt $row_line_count ]] && row_line_count=${#parts[@]}
+            elif [[ "${WRAP_MODES[$j]}" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
+                local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
+                local words=()
+                IFS=' ' read -ra words <<<"$display_value"
+                local current_line=""
+                local line_index=0
+                for word in "${words[@]}"; do
+                    if [[ -z "$current_line" ]]; then
+                        current_line="$word"
+                    elif [[ $(( ${#current_line} + ${#word} + 1 )) -le $content_width ]]; then
+                        current_line="$current_line $word"
+                    else
+                        line_values[$j,$line_index]="$current_line"
+                        current_line="$word"
+                        ((line_index++))
+                    fi
+                done
+                if [[ -n "$current_line" ]]; then
+                    line_values[$j,$line_index]="$current_line"
+                    ((line_index++))
+                fi
+                [[ $line_index -gt $row_line_count ]] && row_line_count=$line_index
             else
+                local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
+                if [[ ${#display_value} -gt $content_width ]]; then
+                    case "${JUSTIFICATIONS[$j]}" in
+                        right)
+                            display_value="${display_value: -${content_width}}"
+                            ;;
+                        center)
+                            local excess=$(( ${#display_value} - content_width ))
+                            local left_clip=$(( excess / 2 ))
+                            display_value="${display_value:${left_clip}:${content_width}}"
+                            ;;
+                        *)
+                            display_value="${display_value:0:${content_width}}"
+                            ;;
+                    esac
+                fi
                 line_values[$j,0]="$display_value"
             fi
         done
@@ -507,7 +571,9 @@ render_table_footer() {
     
     if [[ -n "$TABLE_FOOTER" ]]; then
         debug_log "Rendering table footer: $TABLE_FOOTER with position: $FOOTER_POSITION"
-        calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
+        # Evaluate any shell commands in the footer before width calculation
+        local footer_text=$(eval echo "$TABLE_FOOTER" 2>/dev/null)
+        calculate_footer_width "$footer_text" "$total_table_width"
         
         local footer_offset=0
         case "$FOOTER_POSITION" in
@@ -524,10 +590,27 @@ render_table_footer() {
         fi
         
         local available_width=$((FOOTER_WIDTH - (2 * DEFAULT_PADDING)))
-        local footer_text="$TABLE_FOOTER"
         
         if [[ ${#footer_text} -gt $available_width ]]; then
-            footer_text="${footer_text:0:$available_width}"
+            case "$FOOTER_POSITION" in
+                left)
+                    footer_text="${footer_text:0:$available_width}"
+                    ;;
+                right)
+                    footer_text="${footer_text: -$available_width}"
+                    ;;
+                center)
+                    local excess=$(( ${#footer_text} - available_width ))
+                    local left_clip=$(( excess / 2 ))
+                    footer_text="${footer_text:$left_clip:$available_width}"
+                    ;;
+                full)
+                    footer_text="${footer_text:0:$available_width}"
+                    ;;
+                *)
+                    footer_text="${footer_text:0:$available_width}"
+                    ;;
+            esac
         fi
         
         case "$FOOTER_POSITION" in
@@ -564,9 +647,11 @@ render_table_footer() {
         if [[ $footer_offset -gt 0 ]]; then
             printf "%*s" "$footer_offset" ""
         fi
-        printf "%s%s" "${THEME[border_color]}" "${THEME[bl_corner]}"
-        printf "${THEME[h_line]}%.0s" $(seq 1 "$FOOTER_WIDTH")
-        printf "%s%s\n" "${THEME[br_corner]}" "${THEME[text_color]}"
+        echo -ne "${THEME[border_color]}${THEME[bl_corner]}"
+        for i in $(seq 1 "$FOOTER_WIDTH"); do
+            echo -ne "${THEME[h_line]}"
+        done
+        echo -ne "${THEME[br_corner]}${THEME[text_color]}\n"
     fi
 }
 
@@ -592,11 +677,11 @@ render_summaries_row() {
                     if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
                             local formatted_num
-                            formatted_num=$(echo "${SUM_SUMMARIES[i]}" | awk '{ printf "%\047d", $0 }')
+                            formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
                             summary_value="${formatted_num}m"
                         elif [[ "$datatype" == "kmem" ]]; then
                             local formatted_num
-                            formatted_num=$(echo "${SUM_SUMMARIES[i]}" | awk '{ printf "%\047d", $0 }')
+                            formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
                             summary_value="${formatted_num}M"
                         elif [[ "$datatype" == "num" ]]; then
                             summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
@@ -607,11 +692,11 @@ render_summaries_row() {
                     fi
                     ;;
                 min)
-                    summary_value="${MIN_SUMMARIES[i]:-}"
+                    summary_value="${MIN_SUMMARIES[$i]:-}"
                     [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
                     ;;
                 max)
-                    summary_value="${MAX_SUMMARIES[i]:-}"
+                    summary_value="${MAX_SUMMARIES[$i]:-}"
                     [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
                     ;;
                 count)
@@ -621,6 +706,31 @@ render_summaries_row() {
                     if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
                         summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '
 ' | sort -u | wc -l | awk '{print $1}')
+                    else
+                        summary_value="0"
+                    fi
+                    ;;
+                avg)
+                    if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
+                        local avg_result
+                        avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}}")
+                        
+                        # Format based on datatype
+                        if [[ "$datatype" == "int" ]]; then
+                            summary_value=$(printf "%.0f" "$avg_result")
+                        elif [[ "$datatype" == "float" ]]; then
+                            # Use same decimal precision as format if available, otherwise 2 decimals
+                            if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then
+                                local decimals="${BASH_REMATCH[1]}"
+                                summary_value=$(printf "%.${decimals}f" "$avg_result")
+                            else
+                                summary_value=$(printf "%.2f" "$avg_result")
+                            fi
+                        elif [[ "$datatype" == "num" ]]; then
+                            summary_value=$(format_num "$avg_result" "$format")
+                        else
+                            summary_value="$avg_result"
+                        fi
                     else
                         summary_value="0"
                     fi

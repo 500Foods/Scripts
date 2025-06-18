@@ -1,154 +1,262 @@
 #!/usr/bin/env bash
 
+# Test Suite 1: Basic - Various datatypes and justifications without headers, footers, or summaries
+# This test suite focuses on demonstrating the core table drawing functionality
+# with different datatypes (text, int, num, float, kcpu, kmem) and justifications (left, right, center)
+
 # Create temporary files for our JSON
 layout_file=$(mktemp)
 data_file=$(mktemp)
-tables_script=$(dirname "$0")/../tables.sh
+tables_script="$(dirname "$0")/../tables.sh"
 
-# Setup the test data we'll use across all tests
+# Cleanup function
+cleanup() {
+    rm -f "$layout_file" "$data_file"
+}
+trap cleanup EXIT
+
+# Setup comprehensive test data showcasing all datatypes
 cat > "$data_file" << 'EOF'
 [
   {
-    "namespace": "kube-system",
-    "pod_name": "coredns-787d4b4b6c-abcd1",
-    "cpu": "100m",
-    "memory": "70Mi"
+    "id": 1,
+    "name": "web-server-01",
+    "cpu_cores": 4,
+    "load_avg": 2.45,
+    "cpu_usage": "1250m",
+    "memory_usage": "2048Mi",
+    "status": "Running"
   },
   {
-    "namespace": "kube-system",
-    "pod_name": "coredns-787d4b4b6c-abcd2",
-    "cpu": "100m",
-    "memory": "70Mi"
+    "id": 2,
+    "name": "db-server-01",
+    "cpu_cores": 8,
+    "load_avg": 5.12,
+    "cpu_usage": "3200m",
+    "memory_usage": "8192Mi", 
+    "status": "Running"
   },
   {
-    "namespace": "default",
-    "pod_name": "nginx-deployment-66b6c48dd5-efgh1",
-    "cpu": "750m",
-    "memory": "768Mi"
+    "id": 3,
+    "name": "cache-server",
+    "cpu_cores": 2,
+    "load_avg": 0.85,
+    "cpu_usage": "500m",
+    "memory_usage": "1024Mi",
+    "status": "Starting"
   },
   {
-    "namespace": "default",
-    "pod_name": "nginx-deployment-66b6c48dd5-efgh2",
-    "cpu": "750m",
-    "memory": "768Mi"
+    "id": 4,
+    "name": "api-gateway",
+    "cpu_cores": 6,
+    "load_avg": 3.21,
+    "cpu_usage": "2100m",
+    "memory_usage": "4096Mi",
+    "status": "Running"
   }
 ]
 EOF
 
-# Test 1: Basic - no title, no footer, no totals, two short columns MEM and CPU
+# Test 1-A: Integer and Text datatypes with different justifications (Theme: Red)
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
   "columns": [
     {
-      "header": "CPU",
-      "key": "cpu",
-      "datatype": "kcpu",
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
       "justification": "right"
     },
     {
-      "header": "MEM",
-      "key": "memory",
-      "datatype": "kmem",
-      "justification": "right"
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 1: Basic - no title, no footer, no totals, two short columns"
-echo "----------------------------------------"
-$tables_script "$layout_file" "$data_file"
-
-# Test 2: Basic Totals - same as test 1 but with sum totals for the two columns
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Red",
-  "columns": [
-    {
-      "header": "CPU",
-      "key": "cpu",
-      "datatype": "kcpu",
-      "justification": "right",
-      "summary": "sum"
-    },
-    {
-      "header": "MEM",
-      "key": "memory",
-      "datatype": "kmem",
-      "justification": "right",
-      "summary": "sum"
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 2: Basic Totals - same as test 1 but with sum totals"
-echo "----------------------------------------"
-$tables_script "$layout_file" "$data_file"
-
-# Test 3: Basic Wide - same as Test 1 but with Pod Name as the first column
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Red",
-  "columns": [
-    {
-      "header": "Pod Name",
-      "key": "pod_name",
-      "datatype": "text"
-    },
-    {
-      "header": "CPU",
-      "key": "cpu",
-      "datatype": "kcpu",
-      "justification": "right"
-    },
-    {
-      "header": "MEM",
-      "key": "memory",
-      "datatype": "kmem",
-      "justification": "right"
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 3: Basic Wide - same as Test 1 but with Pod Name as the first column"
-echo "----------------------------------------"
-$tables_script "$layout_file" "$data_file"
-
-# Test 4: Basic Wide Totals - Same as Test 2 but with count as the total for Pod Name
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Red",
-  "columns": [
-    {
-      "header": "Pod Name",
-      "key": "pod_name",
+      "header": "Server Name", 
+      "key": "name",
       "datatype": "text",
-      "summary": "count"
+      "justification": "left"
     },
     {
-      "header": "CPU",
-      "key": "cpu",
-      "datatype": "kcpu",
-      "justification": "right",
-      "summary": "sum"
-    },
-    {
-      "header": "MEM",
-      "key": "memory",
-      "datatype": "kmem",
-      "justification": "right",
-      "summary": "sum"
+      "header": "Status",
+      "key": "status", 
+      "datatype": "text",
+      "justification": "center"
     }
   ]
 }
 EOF
 
-echo -e "\nTest 4: Basic Wide Totals - Same as Test 2 but with count as the total for Pod Name"
-echo "----------------------------------------"
-$tables_script "$layout_file" "$data_file"
+echo "Test 1-A: Integer and Text datatypes with different justifications"
+echo "----------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
 
-# Cleanup
-rm -f "$layout_file" "$data_file"
+# Test 1-B: Numeric datatypes - int, num, float (Theme: Blue)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id", 
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num", 
+      "justification": "right"
+    },
+    {
+      "header": "Load Average",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 1-B: Numeric datatypes - int, num, float"
+echo "---------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 1-C: Kubernetes resource datatypes - kcpu and kmem (Theme: Red)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red", 
+  "columns": [
+    {
+      "header": "Server",
+      "key": "name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Usage",
+      "key": "cpu_usage", 
+      "datatype": "kcpu",
+      "justification": "right"
+    },
+    {
+      "header": "Memory Usage", 
+      "key": "memory_usage",
+      "datatype": "kmem",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 1-C: Kubernetes resource datatypes - kcpu and kmem"
+echo "-------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 1-D: Mixed datatypes with center justification focus (Theme: Blue)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int", 
+      "justification": "center"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "center"
+    },
+    {
+      "header": "Load",
+      "key": "load_avg", 
+      "datatype": "float",
+      "justification": "center"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 1-D: Mixed datatypes with center justification focus"
+echo "---------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 1-E: All datatypes in single table (Theme: Red)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Name",
+      "key": "name", 
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load",
+      "key": "load_avg",
+      "datatype": "float", 
+      "justification": "right"
+    },
+    {
+      "header": "CPU",
+      "key": "cpu_usage",
+      "datatype": "kcpu",
+      "justification": "right"
+    },
+    {
+      "header": "Memory", 
+      "key": "memory_usage",
+      "datatype": "kmem",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 1-E: All datatypes in single table"
+echo "---------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 1-F: Text datatype with different justifications (Theme: Blue)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "columns": [
+    {
+      "header": "Left Text",
+      "key": "name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "Center Text",
+      "key": "status", 
+      "datatype": "text",
+      "justification": "center"
+    },
+    {
+      "header": "Right Text",
+      "key": "name",
+      "datatype": "text",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 1-F: Text datatype with different justifications"
+echo "-----------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"

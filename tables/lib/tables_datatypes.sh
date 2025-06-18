@@ -11,19 +11,19 @@ declare -A DATATYPE_HANDLERS=(
     [text_summary_types]="count unique"
     [int_validate]="validate_number"
     [int_format]="format_number"
-    [int_summary_types]="sum min max count unique"
+    [int_summary_types]="sum min max avg count unique"
     [num_validate]="validate_number"
     [num_format]="format_num"
-    [num_summary_types]="sum min max count unique"
+    [num_summary_types]="sum min max avg count unique"
     [float_validate]="validate_number"
     [float_format]="format_number"
-    [float_summary_types]="sum min max count unique"
+    [float_summary_types]="sum min max avg count unique"
     [kcpu_validate]="validate_kcpu"
     [kcpu_format]="format_kcpu"
-    [kcpu_summary_types]="sum count"
+    [kcpu_summary_types]="sum min max avg count unique"
     [kmem_validate]="validate_kmem"
     [kmem_format]="format_kmem"
-    [kmem_summary_types]="sum count"
+    [kmem_summary_types]="sum min max avg count unique"
 )
 
 # Validation functions: Ensure data matches expected format
@@ -62,12 +62,10 @@ validate_kmem() {
 
 # Formatting functions: Convert validated data into display format
 format_text() {
-    local value="$1" format="$2" string_limit="$3" wrap_mode="$4" wrap_char="$5"
+    local value="$1" format="$2" string_limit="$3" wrap_mode="$4" wrap_char="$5" justification="$6"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
     if [[ "$string_limit" -gt 0 && ${#value} -gt $string_limit ]]; then
-        if [[ "$wrap_mode" == "clip" ]]; then
-            echo "${value:0:$string_limit}"
-        elif [[ -n "$wrap_char" ]]; then
+        if [[ "$wrap_mode" == "wrap" && -n "$wrap_char" ]]; then
             local wrapped=""
             local IFS="$wrap_char"
             read -ra parts <<< "$value"
@@ -76,8 +74,22 @@ format_text() {
 "
             done
             echo -e "$wrapped" | head -n $((string_limit / ${#wrap_char}))
-        else
+        elif [[ "$wrap_mode" == "wrap" ]]; then
+            # Word wrapping logic could be implemented here if needed
             echo "${value:0:$string_limit}"
+        else
+            case "$justification" in
+                "right")
+                    echo "${value: -${string_limit}}"
+                    ;;
+                "center")
+                    local start=$(( (${#value} - string_limit) / 2 ))
+                    echo "${value:${start}:${string_limit}}"
+                    ;;
+                *)
+                    echo "${value:0:$string_limit}"
+                    ;;
+            esac
         fi
     else
         echo "$value"
@@ -160,15 +172,15 @@ format_kmem() {
 }
 
 # format_display_value: Format a cell value for display
-# Args: value, null_value, zero_value, datatype, format, string_limit, wrap_mode, wrap_char
+# Args: value, null_value, zero_value, datatype, format, string_limit, wrap_mode, wrap_char, justification
 # Returns: formatted display value
 format_display_value() {
-    local value="$1" null_value="$2" zero_value="$3" datatype="$4" format="$5" string_limit="$6" wrap_mode="$7" wrap_char="$8"
+    local value="$1" null_value="$2" zero_value="$3" datatype="$4" format="$5" string_limit="$6" wrap_mode="$7" wrap_char="$8" justification="$9"
     
     local validate_fn="${DATATYPE_HANDLERS[${datatype}_validate]}" format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
     value=$("$validate_fn" "$value")
     local display_value
-    display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
+    display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char" "$justification")
     
     if [[ "$value" == "null" ]]; then
         case "$null_value" in

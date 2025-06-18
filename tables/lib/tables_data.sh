@@ -10,6 +10,8 @@ declare -A COUNT_SUMMARIES=()
 declare -A MIN_SUMMARIES=()
 declare -A MAX_SUMMARIES=()
 declare -A UNIQUE_VALUES=()
+declare -A AVG_SUMMARIES=()
+declare -A AVG_COUNTS=()
 
 # initialize_summaries: Initialize summaries storage
 initialize_summaries() {
@@ -21,6 +23,8 @@ initialize_summaries() {
     MIN_SUMMARIES=()
     MAX_SUMMARIES=()
     UNIQUE_VALUES=()
+    AVG_SUMMARIES=()
+    AVG_COUNTS=()
     
     for ((i=0; i<COLUMN_COUNT; i++)); do
         SUM_SUMMARIES[$i]=0
@@ -28,6 +32,8 @@ initialize_summaries() {
         MIN_SUMMARIES[$i]=""
         MAX_SUMMARIES[$i]=""
         UNIQUE_VALUES[$i]=""
+        AVG_SUMMARIES[$i]=0
+        AVG_COUNTS[$i]=0
     done
 }
 
@@ -180,26 +186,31 @@ process_data_rows() {
                 debug_log "Zero value handling: '$value' -> '$display_value'"
             fi
             
-            # Update column width
-            if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
-                local max_len=0
-                local IFS="$wrap_char"
-                read -ra parts <<<"$display_value"
-                for part in "${parts[@]}"; do
+            # Do not update column width based on content if a width is specified in the layout
+            if [[ ${WIDTHS[j]} -eq $(( ${#HEADERS[j]} + (2 * PADDINGS[j]) )) ]]; then
+                # No specified width in layout, adjust based on content
+                if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
+                    local max_len=0
+                    local IFS="$wrap_char"
+                    read -ra parts <<<"$display_value"
+                    for part in "${parts[@]}"; do
+                        local len
+                        len=$(echo -n "$part" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                        [[ $len -gt $max_len ]] && max_len=$len
+                    done
+                    local padded_width=$((max_len + (2 * PADDINGS[j])))
+                    [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
+                    [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
+                    debug_log "Wrapped value: parts=${#parts[@]}, max_len=$max_len, new width=${WIDTHS[j]}"
+                else
                     local len
-                    len=$(echo -n "$part" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
-                    [[ $len -gt $max_len ]] && max_len=$len
-                done
-                local padded_width=$((max_len + (2 * PADDINGS[j])))
-                [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
-                [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
-                debug_log "Wrapped value: parts=${#parts[@]}, max_len=$max_len, new width=${WIDTHS[j]}"
+                    len=$(echo -n "$display_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                    local padded_width=$((len + (2 * PADDINGS[j])))
+                    [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
+                    debug_log "Plain value: len=$len, new width=${WIDTHS[$j]}"
+                fi
             else
-                local len
-                len=$(echo -n "$display_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
-                local padded_width=$((len + (2 * PADDINGS[j])))
-                [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
-                debug_log "Plain value: len=$len, new width=${WIDTHS[$j]}"
+                debug_log "Enforcing specified width for column $j (${HEADERS[$j]}): width=${WIDTHS[j]} (from layout)"
             fi
             
             # Update summaries
@@ -209,7 +220,7 @@ process_data_rows() {
         [[ $line_count -gt $MAX_LINES ]] && MAX_LINES=$line_count
     done
     
-    # After processing all rows, check if summaries need wider columns
+    # After processing all rows, check if summaries need wider columns, but respect specified width limits
     for ((j=0; j<COLUMN_COUNT; j++)); do
         if [[ "${SUMMARIES[$j]}" != "none" ]]; then
             local summary_value="" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}"
@@ -255,10 +266,35 @@ process_data_rows() {
                         summary_value="0"
                     fi
                     ;;
+                avg)
+                    if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
+                        local avg_result
+                        avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}}")
+                        
+                        # Format based on datatype
+                        if [[ "$datatype" == "int" ]]; then
+                            summary_value=$(printf "%.0f" "$avg_result")
+                        elif [[ "$datatype" == "float" ]]; then
+                            # Use same decimal precision as format if available, otherwise 2 decimals
+                            if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then
+                                local decimals="${BASH_REMATCH[1]}"
+                                summary_value=$(printf "%.${decimals}f" "$avg_result")
+                            else
+                                summary_value=$(printf "%.2f" "$avg_result")
+                            fi
+                        elif [[ "$datatype" == "num" ]]; then
+                            summary_value=$(format_num "$avg_result" "$format")
+                        else
+                            summary_value="$avg_result"
+                        fi
+                    else
+                        summary_value="0"
+                    fi
+                    ;;
             esac
             
-            # If summary exists, check if its width requires column adjustment
-            if [[ -n "$summary_value" ]]; then
+            # If summary exists, check if its width requires column adjustment, but only if no width is specified in layout
+            if [[ -n "$summary_value" && ${WIDTHS[j]} -eq $(( ${#HEADERS[j]} + (2 * PADDINGS[j]) )) ]]; then
                 local summary_len
                 summary_len=$(echo -n "$summary_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
                 local summary_padded_width=$((summary_len + (2 * PADDINGS[j])))
@@ -324,7 +360,21 @@ update_summaries() {
             fi
             ;;
         unique)
-            [[ -n "$value" && "$value" != "null" ]] && UNIQUE_VALUES[$j]+=" $value"
+            if [[ -n "$value" && "$value" != "null" ]]; then
+                if [[ -z "${UNIQUE_VALUES[$j]}" ]]; then
+                    UNIQUE_VALUES[$j]="$value"
+                else
+                    UNIQUE_VALUES[$j]+=" $value"
+                fi
+            fi
+            ;;
+        avg)
+            if [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                    AVG_SUMMARIES[$j]=$(awk "BEGIN {print (${AVG_SUMMARIES[$j]:-0} + $value)}")
+                    AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 ))
+                fi
+            fi
             ;;
     esac
 }

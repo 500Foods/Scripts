@@ -91,12 +91,14 @@ calculate_title_width() {
     local title="$1" total_table_width="$2"
     
     if [[ -n "$title" ]]; then
+        # Evaluate any embedded commands in the title
+        local evaluated_title=$(eval "echo \"$title\"")
         if [[ "$TITLE_POSITION" == "none" ]]; then
-            TITLE_WIDTH=$((${#title} + (2 * DEFAULT_PADDING)))
+            TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING)))
         elif [[ "$TITLE_POSITION" == "full" ]]; then
             TITLE_WIDTH=$total_table_width
         else
-            TITLE_WIDTH=$((${#title} + (2 * DEFAULT_PADDING)))
+            TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING)))
             [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width
         fi
     else
@@ -110,12 +112,14 @@ calculate_footer_width() {
     local footer="$1" total_table_width="$2"
     
     if [[ -n "$footer" ]]; then
+        # Evaluate any embedded commands in the footer
+        local evaluated_footer=$(eval "echo \"$footer\"")
         if [[ "$FOOTER_POSITION" == "none" ]]; then
-            FOOTER_WIDTH=$((${#footer} + (2 * DEFAULT_PADDING)))
+            FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING)))
         elif [[ "$FOOTER_POSITION" == "full" ]]; then
             FOOTER_WIDTH=$total_table_width
         else
-            FOOTER_WIDTH=$((${#footer} + (2 * DEFAULT_PADDING)))
+            FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING)))
             [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width
         fi
     else
