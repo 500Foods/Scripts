@@ -1,29 +1,51 @@
 # Tables
 
-A flexible utility for rendering JSON data as ASCII tables in terminal output. Tables.sh provides a powerful way to visualize structured data with customizable formatting, data processing, and display options.
+A flexible utility for rendering JSON data as ANSI tables in terminal output. Tables.sh provides a powerful way to visualize structured data with customizable formatting, data processing, and display options.
 
 ## Overview
 
-Tables.sh converts JSON data into beautifully formatted ASCII tables with the following features:
+Tables.sh converts JSON data into beautifully formatted ANSI tables with the following features:
 
-- Multiple visual themes with colored borders
+- Multiple visual themes with colored borders and distinct element colors
 - Support for various data types (text, numbers, Kubernetes CPU/memory values)
-- Customizable column configurations (headers, alignment, formatting)
-- Data processing capabilities (sorting, validation, totals calculation)
+- Customizable column configurations (headers, alignment, formatting, width)
+- Data processing capabilities (sorting, validation, summaries calculation)
 - Text wrapping and custom display options for null/zero values
+- Title and footer support with flexible positioning
+- Thousands separator formatting for numeric data
 
 ## Usage
 
 ```bash
-./tables.sh <layout_json_file> <data_json_file> [--debug] [--version]
+./tables.sh <layout_json_file> <data_json_file> [OPTIONS]
 ```
 
 ### Parameters
 
 - `layout_json_file`: JSON file defining table structure and formatting
 - `data_json_file`: JSON file containing the data to display
-- `--debug`: (Optional) Enable debug output
-- `--version`: (Optional) Display version information
+
+### Options
+
+- `--debug`: Enable debug output to stderr
+- `--version`: Display version information
+- `--help`, `-h`: Show help message
+
+### Examples
+
+```bash
+# Basic table rendering
+./tables.sh layout.json data.json
+
+# With debug output
+./tables.sh layout.json data.json --debug
+
+# Show version
+./tables.sh --version
+
+# Show help
+./tables.sh --help
+```
 
 ## Layout JSON Structure
 
@@ -32,6 +54,10 @@ The layout file defines how the table should be structured and formatted:
 ```json
 {
   "theme": "Red",
+  "title": "Table Title",
+  "title_position": "center",
+  "footer": "Table Footer", 
+  "footer_position": "center",
   "sort": [
     {"key": "column_key", "direction": "asc", "priority": 1}
   ],
@@ -43,12 +69,14 @@ The layout file defines how the table should be structured and formatted:
       "datatype": "text",
       "null_value": "blank",
       "zero_value": "blank",
-      "total": "none",
+      "summary": "none",
       "break": false,
       "string_limit": 0,
       "wrap_mode": "clip",
       "wrap_char": "",
-      "padding": 1
+      "padding": 1,
+      "width": 0,
+      "format": ""
     }
   ]
 }
@@ -58,8 +86,41 @@ The layout file defines how the table should be structured and formatted:
 
 The `theme` field defines the visual appearance of the table:
 
-- `"Red"`: Red borders with distinct colors for header, footer, summary, caption, and text
-- `"Blue"`: Blue borders with distinct colors for header, footer, summary, caption, and text
+- `"Red"`: Red borders with distinct colors for different table elements
+- `"Blue"`: Blue borders with distinct colors for different table elements
+
+Each theme includes specific colors for:
+
+- **Border**: Table borders and separators
+- **Header**: Table title text
+- **Caption**: Column header text
+- **Summary**: Summary/totals row text
+- **Footer**: Footer text
+- **Text**: Regular data content
+
+### Title and Footer Support
+
+Tables can include optional titles and footers with flexible positioning:
+
+#### Title Configuration
+
+- `title`: The title text to display above the table
+- `title_position`: Position of the title relative to the table
+  - `"left"`: Left-aligned title
+  - `"right"`: Right-aligned title
+  - `"center"`: Centered title
+  - `"full"`: Title spans the full table width
+  - `"none"`: No title (default)
+
+#### Footer Configuration
+
+- `footer`: The footer text to display below the table
+- `footer_position`: Position of the footer relative to the table
+  - `"left"`: Left-aligned footer
+  - `"right"`: Right-aligned footer
+  - `"center"`: Centered footer
+  - `"full"`: Footer spans the full table width
+  - `"none"`: No footer (default)
 
 ### Sort Configuration
 
@@ -78,15 +139,17 @@ Each column in the `columns` array can have the following properties:
 | `header` | Column header text | (required) | Any string |
 | `key` | JSON field name in the data | Derived from header | Any string |
 | `justification` | Text alignment | `"left"` | `"left"`, `"right"`, `"center"` |
-| `datatype` | Data type for validation and formatting | `"text"` | `"text"`, `"int"`, `"float"`, `"kcpu"`, `"kmem"` |
+| `datatype` | Data type for validation and formatting | `"text"` | `"text"`, `"int"`, `"num"`, `"float"`, `"kcpu"`, `"kmem"` |
 | `null_value` | How to display null values | `"blank"` | `"blank"`, `"0"`, `"missing"` |
 | `zero_value` | How to display zero values | `"blank"` | `"blank"`, `"0"`, `"missing"` |
-| `total` | Type of total to calculate | `"none"` | See "Total Types" section |
+| `summary` | Type of summary to calculate | `"none"` | See "Summary Types" section |
 | `break` | Insert separator when value changes | `false` | `true`, `false` |
 | `string_limit` | Maximum string length | `0` (unlimited) | Any integer |
 | `wrap_mode` | How to handle text exceeding limit | `"clip"` | `"clip"`, `"wrap"` |
 | `wrap_char` | Character to use for wrapping | `""` | Any character |
 | `padding` | Padding spaces on each side | `1` | Any integer |
+| `width` | Fixed column width | `0` (auto) | Any integer |
+| `format` | Custom format string | `""` | Format string |
 
 ## Supported Data Types
 
@@ -98,7 +161,7 @@ Text data with optional wrapping and length limits.
 
 - **Validation**: Any non-null text value
 - **Formatting**: Raw text with optional clipping/wrapping
-- **Total Types**: `count`, `unique`
+- **Summary Types**: `count`, `unique`
 
 ### int / float
 
@@ -106,42 +169,51 @@ Integer or floating-point numbers.
 
 - **Validation**: Any valid number
 - **Formatting**: Raw number or custom format string
-- **Total Types**: `sum`, `min`, `max`, `count`, `unique`
+- **Summary Types**: `sum`, `min`, `max`, `count`, `unique`
+
+### num
+
+Numeric values with thousands separator formatting.
+
+- **Validation**: Any valid number
+- **Formatting**: Numbers formatted with thousands separators (e.g., "1,234")
+- **Summary Types**: `sum`, `min`, `max`, `count`, `unique`
 
 ### kcpu
 
 Kubernetes-style CPU values (e.g., `100m` for 100 millicores).
 
 - **Validation**: Values with `m` suffix or numeric values
-- **Formatting**: Always with `m` suffix
-- **Total Types**: `sum`, `count`
+- **Formatting**: Always with `m` suffix and thousands separators
+- **Summary Types**: `sum`, `count`
 
 ### kmem
 
 Kubernetes-style memory values (e.g., `128M`, `1G`, `512Ki`).
 
 - **Validation**: Values with `K`, `M`, `G`, `Ki`, `Mi`, `Gi` suffixes
-- **Formatting**: Normalized to `K`, `M`, or `G` format
-- **Total Types**: `sum`, `count`
+- **Formatting**: Normalized to `K`, `M`, or `G` format with thousands separators
+- **Summary Types**: `sum`, `count`
 
-## Total Types
+## Summary Types
 
-Depending on the data type, the following total calculations are available:
+Depending on the data type, the following summary calculations are available:
 
 - `sum`: Sum of all values (numeric types, kcpu, kmem)
 - `min`: Minimum value (numeric types)
 - `max`: Maximum value (numeric types)
 - `count`: Count of non-null values (all types)
 - `unique`: Count of unique values (all types)
-- `none`: No total (default)
+- `none`: No summary (default)
 
-## Examples
+## Example Tables
 
 ### Basic Example
 
 This example renders a table of Kubernetes pod information:
 
 **Layout JSON (layout.json):**
+
 ```json
 {
   "theme": "Red",
@@ -163,13 +235,14 @@ This example renders a table of Kubernetes pod information:
       "key": "cpu_use",
       "justification": "right",
       "datatype": "kcpu",
-      "total": "sum"
+      "summary": "sum"
     }
   ]
 }
 ```
 
 **Data JSON (data.json):**
+
 ```json
 [
   {
@@ -186,12 +259,14 @@ This example renders a table of Kubernetes pod information:
 ```
 
 **Command:**
+
 ```bash
 ./tables.sh layout.json data.json
 ```
 
 **Output:**
-```
+
+```table
 ╭───────────┬────────────┬─────────╮
 │POD        │ NAMESPACE  │  CPU USE│
 ├───────────┼────────────┼─────────┤
@@ -202,14 +277,19 @@ This example renders a table of Kubernetes pod information:
 ╰───────────┴────────────┴─────────╯
 ```
 
-### Advanced Example
+### Advanced Example with Title and Footer
 
-This example demonstrates more features, including sorting, text wrapping, and data grouping:
+This example demonstrates more features, including titles, footers, sorting, and summaries:
 
 **Layout JSON:**
+
 ```json
 {
   "theme": "Blue",
+  "title": "Pod Resource Usage Report",
+  "title_position": "center",
+  "footer": "Generated by tables.sh",
+  "footer_position": "right",
   "sort": [
     {"key": "namespace", "direction": "asc", "priority": 1},
     {"key": "pod", "direction": "asc", "priority": 2}
@@ -220,7 +300,7 @@ This example demonstrates more features, including sorting, text wrapping, and d
       "key": "pod",
       "justification": "left",
       "datatype": "text",
-      "total": "count"
+      "summary": "count"
     },
     {
       "header": "NAMESPACE",
@@ -235,7 +315,7 @@ This example demonstrates more features, including sorting, text wrapping, and d
       "justification": "right",
       "datatype": "kcpu",
       "null_value": "missing",
-      "total": "sum"
+      "summary": "sum"
     },
     {
       "header": "MEM USE",
@@ -243,22 +323,21 @@ This example demonstrates more features, including sorting, text wrapping, and d
       "justification": "right",
       "datatype": "kmem",
       "zero_value": "0",
-      "total": "sum"
+      "summary": "sum"
     },
     {
-      "header": "PORTS",
-      "key": "ports",
-      "justification": "left",
-      "datatype": "text",
-      "string_limit": 15,
-      "wrap_mode": "wrap",
-      "wrap_char": ";"
+      "header": "REQUESTS",
+      "key": "requests",
+      "justification": "right",
+      "datatype": "num",
+      "summary": "sum"
     }
   ]
 }
 ```
 
 **Data JSON:**
+
 ```json
 [
   {
@@ -266,48 +345,59 @@ This example demonstrates more features, including sorting, text wrapping, and d
     "namespace": "ns1",
     "cpu_use": "100m",
     "mem_use": "128M",
-    "ports": "8080/TCP;8443/TCP"
+    "requests": 1500
   },
   {
     "pod": "pod-b",
     "namespace": "ns1",
     "cpu_use": "50m",
     "mem_use": "64M",
-    "ports": "80/TCP"
+    "requests": 750
   },
   {
     "pod": "pod-c",
     "namespace": "ns2",
     "cpu_use": null,
     "mem_use": "256M",
-    "ports": ""
+    "requests": 2000
   },
   {
     "pod": "pod-d",
     "namespace": "ns2",
     "cpu_use": "200m",
     "mem_use": null,
-    "ports": "9090/TCP;9091/TCP;9092/TCP"
+    "requests": 1200
   }
 ]
 ```
 
-**Output:**
+### Title and Footer Positioning Examples
+
+**Short Title (shorter than table width):**
+
+```json
+{
+  "title": "Pod Stats",
+  "title_position": "left"
+}
 ```
-╭───────────┬────────────┬─────────┬─────────┬───────────────╮
-│POD        │ NAMESPACE  │  CPU USE│  MEM USE│PORTS          │
-├───────────┼────────────┼─────────┼─────────┼───────────────┤
-│pod-a      │    ns1     │     100m│     128M│8080/TCP       │
-│           │            │         │         │8443/TCP       │
-│pod-b      │            │      50m│      64M│80/TCP         │
-├───────────┼────────────┼─────────┼─────────┼───────────────┤
-│pod-c      │    ns2     │  Missing│     256M│               │
-│pod-d      │            │     200m│  Missing│9090/TCP       │
-│           │            │         │         │9091/TCP       │
-│           │            │         │         │9092/TCP       │
-├───────────┼────────────┼─────────┼─────────┼───────────────┤
-│4          │            │     350m│     448M│               │
-╰───────────┴────────────┴─────────┴─────────┴───────────────╯
+
+**Wide Title (wider than table width):**
+
+```json
+{
+  "title": "Kubernetes Cluster Pod Resource Utilization Report - Production Environment",
+  "title_position": "center"
+}
+```
+
+**Full Width Title:**
+
+```json
+{
+  "title": "System Report",
+  "title_position": "full"
+}
 ```
 
 ## Using in Scripts
@@ -324,6 +414,8 @@ source ./tables.sh
 cat > layout.json << 'EOF'
 {
   "theme": "Red",
+  "title": "Sample Report",
+  "title_position": "center",
   "columns": [
     {
       "header": "NAME",
@@ -333,7 +425,8 @@ cat > layout.json << 'EOF'
     {
       "header": "VALUE",
       "key": "value",
-      "datatype": "int"
+      "datatype": "num",
+      "summary": "sum"
     }
   ]
 }
@@ -341,8 +434,8 @@ EOF
 
 cat > data.json << 'EOF'
 [
-  {"name": "Item A", "value": 10},
-  {"name": "Item B", "value": 20}
+  {"name": "Item A", "value": 1000},
+  {"name": "Item B", "value": 2500}
 ]
 EOF
 
@@ -354,6 +447,7 @@ draw_table layout.json data.json
 
 1. **Column Width Management**:
    - The script automatically determines column widths based on content
+   - Use `width` property to set fixed column widths
    - Use `string_limit` and `wrap_mode` for wide columns
 
 2. **Data Sorting**:
@@ -364,76 +458,26 @@ draw_table layout.json data.json
    - Choose appropriate `null_value` and `zero_value` settings for each column
    - Options include showing blank space, "0", or "Missing"
 
-4. **Performance**:
+4. **Title and Footer Design**:
+   - Use `title_position` and `footer_position` to control alignment
+   - Consider table width when designing titles and footers
+   - Use `"full"` position for titles/footers that should span the entire table width
+
+5. **Performance**:
    - Very large datasets may cause performance issues
    - Consider limiting data or pre-filtering for large datasets
 
-5. **Color Compatibility**:
+6. **Color Compatibility**:
    - The colored output uses ANSI escape sequences which work in most terminals
    - For environments without color support, consider piping through `cat -A` to see escape sequences
 
-## Color Demo
+## Dependencies
 
-The tables.sh script now supports distinct colors for different table elements in the themes. Below is an example of a table layout that demonstrates the color settings for header, footer, summary, caption, and text using the "Red" theme:
+- `jq` (JSON processor)
+- `bash` 4.0+
+- `awk`
+- `sed`
 
-**Layout JSON (color_demo_layout.json):**
-```json
-{
-  "theme": "Red",
-  "title": "Header",
-  "title_position": "center",
-  "footer": "Footer",
-  "footer_position": "center",
-  "columns": [
-    {
-      "header": "Caption",
-      "key": "caption",
-      "justification": "left",
-      "datatype": "text"
-    },
-    {
-      "header": "Text",
-      "key": "text",
-      "justification": "center",
-      "datatype": "text"
-    },
-    {
-      "header": "Summary",
-      "key": "summary",
-      "justification": "right",
-      "datatype": "int",
-      "total": "sum"
-    }
-  ]
-}
-```
+## Version Information
 
-**Data JSON (color_demo_data.json):**
-```json
-[
-  {
-    "caption": "Caption Text",
-    "text": "Text Content",
-    "summary": 100
-  },
-  {
-    "caption": "Caption Text 2",
-    "text": "More Text",
-    "summary": 200
-  }
-]
-```
-
-**Command:**
-```bash
-./tables.sh color_demo_layout.json color_demo_data.json
-```
-
-**Expected Output Description:**
-- **Header**: Displayed at the top, centered, with a bright white color.
-- **Caption**: Column headers with a green color in the "Red" theme.
-- **Text**: Regular data content in the default terminal color.
-- **Summary**: The totals row at the bottom with a bright white color, distinct from other elements.
-- **Footer**: Displayed at the bottom, centered, with a bright cyan color.
-
-This setup showcases the distinct color settings for each element of the table as defined in the updated themes.
+Use `./tables.sh --version` to see the current version and `./tables.sh --help` for usage information.

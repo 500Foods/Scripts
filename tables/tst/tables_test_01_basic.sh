@@ -3,6 +3,7 @@
 # Create temporary files for our JSON
 layout_file=$(mktemp)
 data_file=$(mktemp)
+tables_script=$(dirname "$0")/../tables.sh
 
 # Setup the test data we'll use across all tests
 cat > "$data_file" << 'EOF'
@@ -57,7 +58,7 @@ EOF
 
 echo -e "\nTest 1: Basic - no title, no footer, no totals, two short columns"
 echo "----------------------------------------"
-./tables.sh "$layout_file" "$data_file"
+$tables_script "$layout_file" "$data_file"
 
 # Test 2: Basic Totals - same as test 1 but with sum totals for the two columns
 cat > "$layout_file" << 'EOF'
@@ -69,14 +70,14 @@ cat > "$layout_file" << 'EOF'
       "key": "cpu",
       "datatype": "kcpu",
       "justification": "right",
-      "total": "sum"
+      "summary": "sum"
     },
     {
       "header": "MEM",
       "key": "memory",
       "datatype": "kmem",
       "justification": "right",
-      "total": "sum"
+      "summary": "sum"
     }
   ]
 }
@@ -84,7 +85,7 @@ EOF
 
 echo -e "\nTest 2: Basic Totals - same as test 1 but with sum totals"
 echo "----------------------------------------"
-./tables.sh "$layout_file" "$data_file"
+$tables_script "$layout_file" "$data_file"
 
 # Test 3: Basic Wide - same as Test 1 but with Pod Name as the first column
 cat > "$layout_file" << 'EOF'
@@ -114,7 +115,7 @@ EOF
 
 echo -e "\nTest 3: Basic Wide - same as Test 1 but with Pod Name as the first column"
 echo "----------------------------------------"
-./tables.sh "$layout_file" "$data_file"
+$tables_script "$layout_file" "$data_file"
 
 # Test 4: Basic Wide Totals - Same as Test 2 but with count as the total for Pod Name
 cat > "$layout_file" << 'EOF'
@@ -125,21 +126,21 @@ cat > "$layout_file" << 'EOF'
       "header": "Pod Name",
       "key": "pod_name",
       "datatype": "text",
-      "total": "count"
+      "summary": "count"
     },
     {
       "header": "CPU",
       "key": "cpu",
       "datatype": "kcpu",
       "justification": "right",
-      "total": "sum"
+      "summary": "sum"
     },
     {
       "header": "MEM",
       "key": "memory",
       "datatype": "kmem",
       "justification": "right",
-      "total": "sum"
+      "summary": "sum"
     }
   ]
 }
@@ -147,7 +148,7 @@ EOF
 
 echo -e "\nTest 4: Basic Wide Totals - Same as Test 2 but with count as the total for Pod Name"
 echo "----------------------------------------"
-./tables.sh "$layout_file" "$data_file"
+$tables_script "$layout_file" "$data_file"
 
 # Cleanup
 rm -f "$layout_file" "$data_file"

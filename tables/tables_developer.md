@@ -6,13 +6,34 @@ This document provides detailed technical information about the internal working
 
 The tables.sh script is organized into several functional components:
 
-1. **Configuration System**: Parses and validates layout and data JSON files
-2. **Theme System**: Manages visual appearance with customizable themes
-3. **Datatype System**: Validates and formats different types of data
-4. **Data Processing Pipeline**: Prepares, sorts, and processes data rows
-5. **Rendering System**: Draws the table with borders, content, and totals
+1. **Main Script** (`tables.sh`): Entry point, argument parsing, and main execution flow
+2. **Configuration System** (`lib/tables_config.sh`): Parses and validates layout and data JSON files
+3. **Theme System** (`lib/tables_themes.sh`): Manages visual appearance with customizable themes
+4. **Datatype System** (`lib/tables_datatypes.sh`): Validates and formats different types of data
+5. **Data Processing Pipeline** (`lib/tables_data.sh`): Prepares, sorts, and processes data rows
+6. **Rendering System** (`lib/tables_render.sh`): Draws the table with borders, content, and summaries
 
 The script follows a modular design with clearly defined functions for each component, making it extensible without requiring significant changes to the core code.
+
+## File Structure
+
+```directory
+tables/
+├── tables.sh                    # Main script and entry point
+├── lib/
+│   ├── tables_config.sh         # Configuration parsing and validation
+│   ├── tables_data.sh           # Data processing pipeline
+│   ├── tables_datatypes.sh      # Data type system
+│   ├── tables_render.sh         # Table rendering system
+│   └── tables_themes.sh         # Theme definitions
+├── tst/                         # Test files
+│   ├── tables_test_01_basic.sh
+│   ├── tables_test_03_titles.sh
+│   ├── tables_test_05_footers.sh
+│   └── ...
+├── tables.md                    # User documentation
+└── tables_developer.md         # This file
+```
 
 ## Core Components and Flow
 
@@ -20,15 +41,15 @@ The main execution flow follows these steps:
 
 1. Parse arguments and validate input files
 2. Parse layout JSON and set theme
-3. Initialize totals storage
+3. Initialize summaries storage
 4. Read and prepare data
 5. Sort data if specified
-6. Process data rows, update column widths, calculate totals
-7. Render the table (borders, headers, data rows, totals)
+6. Process data rows, update column widths, calculate summaries
+7. Render the table (title, borders, headers, data rows, summaries, footer)
 
 Here's a visualization of the data flow:
 
-```
+```diagram
 Input JSON Files
        ↓
 Configuration Parsing
@@ -44,6 +65,51 @@ Configuration Parsing
     Output
 ```
 
+## Global Variables and Arrays
+
+The script uses several global variables and arrays to maintain state:
+
+### Configuration Arrays
+
+- `HEADERS[]`: Column header text
+- `KEYS[]`: JSON field names for data extraction
+- `JUSTIFICATIONS[]`: Text alignment (left, right, center)
+- `DATATYPES[]`: Data type for each column
+- `NULL_VALUES[]`: How to display null values
+- `ZERO_VALUES[]`: How to display zero values
+- `FORMATS[]`: Custom format strings
+- `SUMMARIES[]`: Summary type for each column
+- `BREAKS[]`: Whether to insert separators on value changes
+- `STRING_LIMITS[]`: Maximum string lengths
+- `WRAP_MODES[]`: Text wrapping behavior
+- `WRAP_CHARS[]`: Characters used for wrapping
+- `PADDINGS[]`: Padding spaces for each column
+- `WIDTHS[]`: Calculated or specified column widths
+
+### Sort Configuration
+
+- `SORT_KEYS[]`: Keys to sort by
+- `SORT_DIRECTIONS[]`: Sort directions (asc/desc)
+- `SORT_PRIORITIES[]`: Sort priorities
+
+### Data Storage
+
+- `ROW_JSONS[]`: Processed row data
+- `SUM_SUMMARIES{}`: Sum calculations by column
+- `COUNT_SUMMARIES{}`: Count calculations by column
+- `MIN_SUMMARIES{}`: Minimum values by column
+- `MAX_SUMMARIES{}`: Maximum values by column
+- `UNIQUE_VALUES{}`: Unique value tracking by column
+
+### Title and Footer Support
+
+- `TABLE_TITLE`: Title text
+- `TITLE_WIDTH`: Calculated title width
+- `TITLE_POSITION`: Title positioning (left, right, center, full, none)
+- `TABLE_FOOTER`: Footer text
+- `FOOTER_WIDTH`: Calculated footer width
+- `FOOTER_POSITION`: Footer positioning (left, right, center, full, none)
+
 ## Theme System
 
 The theme system defines the visual appearance of tables, including colors and border characters.
@@ -54,34 +120,60 @@ Each theme is stored as an associative array with the following keys:
 
 ```bash
 declare -A THEME_NAME=(
-    [border_color]='ANSI color code'
-    [header_color]='ANSI color code'
-    [text_color]='ANSI color code'
-    [tl_corner]='character'  # Top-left corner
-    [tr_corner]='character'  # Top-right corner
-    [bl_corner]='character'  # Bottom-left corner
-    [br_corner]='character'  # Bottom-right corner
-    [h_line]='character'     # Horizontal line
-    [v_line]='character'     # Vertical line
-    [t_junct]='character'    # Top junction
-    [b_junct]='character'    # Bottom junction
-    [l_junct]='character'    # Left junction
-    [r_junct]='character'    # Right junction
-    [cross]='character'      # Cross junction
+    [border_color]='ANSI color code'    # Table borders and separators
+    [caption_color]='ANSI color code'   # Column headers
+    [header_color]='ANSI color code'    # Table title
+    [footer_color]='ANSI color code'    # Table footer
+    [summary_color]='ANSI color code'   # Summary/totals row
+    [text_color]='ANSI color code'      # Regular data content
+    [tl_corner]='character'             # Top-left corner
+    [tr_corner]='character'             # Top-right corner
+    [bl_corner]='character'             # Bottom-left corner
+    [br_corner]='character'             # Bottom-right corner
+    [h_line]='character'                # Horizontal line
+    [v_line]='character'                # Vertical line
+    [t_junct]='character'               # Top junction
+    [b_junct]='character'               # Bottom junction
+    [l_junct]='character'               # Left junction
+    [r_junct]='character'               # Right junction
+    [cross]='character'                 # Cross junction
 )
 ```
+
+### Current Themes
+
+**Red Theme:**
+
+- Border: Red (`\033[0;31m`)
+- Caption: Green (`\033[0;32m`)
+- Header: Bright White (`\033[1;37m`)
+- Footer: Cyan (`\033[0;36m`)
+- Summary: Bright White (`\033[1;37m`)
+- Text: Default (`\033[0m`)
+
+**Blue Theme:**
+
+- Border: Blue (`\033[0;34m`)
+- Caption: Blue (`\033[0;34m`)
+- Header: Bright White (`\033[1;37m`)
+- Footer: Cyan (`\033[0;36m`)
+- Summary: Bright White (`\033[1;37m`)
+- Text: Default (`\033[0m`)
 
 ### Adding a New Theme
 
 To add a new theme, follow these steps:
 
-1. Define a new associative array with all required theme elements:
+1. Define a new associative array in `lib/tables_themes.sh`:
 
 ```bash
 declare -A GREEN_THEME=(
-    [border_color]='\033[0;32m' # Green border color
-    [header_color]='\033[0;32m' # Green header color
-    [text_color]='\033[0m'      # Default text color
+    [border_color]='\033[0;32m'  # Green border color
+    [caption_color]='\033[0;32m' # Green caption color
+    [header_color]='\033[1;37m'  # White header color
+    [footer_color]='\033[0;36m'  # Cyan footer color
+    [summary_color]='\033[1;37m' # White summary color
+    [text_color]='\033[0m'       # Default text color
     [tl_corner]='╭'
     [tr_corner]='╮'
     [bl_corner]='╰'
@@ -96,7 +188,7 @@ declare -A GREEN_THEME=(
 )
 ```
 
-2. Update the `get_theme` function to support your new theme:
+1. Update the `get_theme` function to support your new theme:
 
 ```bash
 get_theme() {
@@ -132,20 +224,9 @@ get_theme() {
 }
 ```
 
-3. Test your new theme by specifying it in the layout JSON:
-
-```json
-{
-  "theme": "Green",
-  "columns": [
-    ...
-  ]
-}
-```
-
 ## Datatype System
 
-The datatype system manages how different types of data are validated, formatted, and totaled.
+The datatype system manages how different types of data are validated, formatted, and summarized.
 
 ### Datatype Registry
 
@@ -155,24 +236,45 @@ The script uses a registry pattern to map datatypes to their respective function
 declare -A DATATYPE_HANDLERS=(
     [text_validate]="validate_text"
     [text_format]="format_text"
-    [text_total_types]="count unique"
+    [text_summary_types]="count unique"
     [int_validate]="validate_number"
     [int_format]="format_number"
-    [int_total_types]="sum min max count unique"
-    # Other datatype handlers...
+    [int_summary_types]="sum min max count unique"
+    [num_validate]="validate_number"
+    [num_format]="format_num"
+    [num_summary_types]="sum min max count unique"
+    [float_validate]="validate_number"
+    [float_format]="format_number"
+    [float_summary_types]="sum min max count unique"
+    [kcpu_validate]="validate_kcpu"
+    [kcpu_format]="format_kcpu"
+    [kcpu_summary_types]="sum count"
+    [kmem_validate]="validate_kmem"
+    [kmem_format]="format_kmem"
+    [kmem_summary_types]="sum count"
 )
 ```
 
 For each datatype, three entries are registered:
+
 - `datatype_validate`: Function to validate input values
 - `datatype_format`: Function to format values for display
-- `datatype_total_types`: Space-separated list of supported total types
+- `datatype_summary_types`: Space-separated list of supported summary types
+
+### Current Data Types
+
+1. **text**: Plain text with optional wrapping
+2. **int**: Integer numbers
+3. **float**: Floating-point numbers
+4. **num**: Numbers with thousands separator formatting
+5. **kcpu**: Kubernetes CPU values (e.g., "100m")
+6. **kmem**: Kubernetes memory values (e.g., "128M", "1G")
 
 ### Adding a New Datatype
 
 To add a new datatype, follow these steps:
 
-1. Define validation and formatting functions:
+1. Define validation and formatting functions in `lib/tables_datatypes.sh`:
 
 ```bash
 # Example: Adding a "percentage" datatype
@@ -200,192 +302,164 @@ format_percentage() {
 }
 ```
 
-2. Update the datatype registry:
+1. Update the datatype registry:
 
 ```bash
 declare -A DATATYPE_HANDLERS=(
     # Existing handlers...
     [percentage_validate]="validate_percentage"
     [percentage_format]="format_percentage"
-    [percentage_total_types]="sum min max count unique"
+    [percentage_summary_types]="sum min max count unique"
 )
 ```
 
-3. Test your new datatype by specifying it in the layout JSON:
-
-```json
-{
-  "columns": [
-    {
-      "header": "COMPLETION",
-      "key": "completion",
-      "datatype": "percentage",
-      "justification": "right"
-    }
-  ]
-}
-```
-
-### Implementing Total Functions
-
-For custom datatypes that need special handling for totals, you may need to update the `update_totals` function:
-
-```bash
-update_totals() {
-    local j="$1" value="$2" datatype="$3" total_type="$4"
-    
-    case "$total_type" in
-        sum)
-            # Add handling for your custom datatype
-            if [[ "$datatype" == "percentage" && "$value" =~ ^[0-9]+(\.[0-9]+)?%$ ]]; then
-                # Extract numeric value without % sign
-                local numeric_value=${value%\%}
-                SUM_TOTALS[$j]=$(awk "BEGIN {print (${SUM_TOTALS[$j]:-0} + $numeric_value)}")
-            }
-            # Existing handlers...
-            ;;
-        # Other total types...
-    esac
-}
-```
+1. If needed, update the `update_summaries` function in `lib/tables_data.sh` for custom summary handling.
 
 ## Data Processing Pipeline
 
 The data processing pipeline handles preparing, sorting, and processing data for display.
 
-### Key Components
+### Key Functions
 
-1. **prepare_data**: Reads and validates data from JSON
-2. **sort_data**: Applies sorting based on configuration
-3. **process_data_rows**: Processes rows, updates column widths, calculates totals
-4. **update_totals**: Updates running totals for columns
+1. **initialize_summaries**: Initialize summary storage arrays
+2. **prepare_data**: Read and validate data from JSON file
+3. **sort_data**: Apply sorting based on configuration
+4. **process_data_rows**: Process rows, update column widths, calculate summaries
+5. **update_summaries**: Update running summaries for columns
 
-### Extending Sorting Capabilities
+### Summary Calculations
 
-To add more advanced sorting options:
+The system supports several summary types:
 
-1. Modify the `parse_sort_config` function to accept additional parameters:
+- **sum**: Arithmetic sum of numeric values
+- **min**: Minimum value
+- **max**: Maximum value
+- **count**: Count of non-null values
+- **unique**: Count of unique values
 
-```bash
-parse_sort_config() {
-    local sort_json="$1"
-    debug_log "Parsing sort configuration"
-    
-    # Clear sort arrays
-    SORT_KEYS=()
-    SORT_DIRECTIONS=()
-    SORT_PRIORITIES=()
-    SORT_TYPES=()  # New array for sort types
-    
-    # Process sort configuration
-    for ((i=0; i<sort_count; i++)); do
-        local sort_item
-        sort_item=$(jq -c ".[$i]" <<<"$sort_json")
-        SORT_KEYS[$i]=$(jq -r '.key // ""' <<<"$sort_item")
-        SORT_DIRECTIONS[$i]=$(jq -r '.direction // "asc"' <<<"$sort_item" | tr '[:upper:]' '[:lower:]')
-        SORT_PRIORITIES[$i]=$(jq -r '.priority // 0' <<<"$sort_item")
-        SORT_TYPES[$i]=$(jq -r '.type // "lexical"' <<<"$sort_item" | tr '[:upper:]' '[:lower:]')
-        
-        # Validate sort type
-        if [[ "${SORT_TYPES[$i]}" != "lexical" && "${SORT_TYPES[$i]}" != "numeric" && "${SORT_TYPES[$i]}" != "version" ]]; then
-            echo -e "${THEME[border_color]}Warning: Invalid sort type '${SORT_TYPES[$i]}' for key ${SORT_KEYS[$i]}, using 'lexical'${THEME[text_color]}" >&2
-            SORT_TYPES[$i]="lexical"
-        fi
-    done
-}
-```
-
-2. Update the `sort_data` function to use the new sort types:
+Summary calculations are handled differently based on data type:
 
 ```bash
-sort_data() {
-    local data_json="$1"
-    debug_log "Sorting data"
+update_summaries() {
+    local j="$1" value="$2" datatype="$3" summary_type="$4"
     
-    # Build sort expression based on sort types
-    # This would require more complex sort logic...
+    case "$summary_type" in
+        sum)
+            if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then
+                SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%m} ))
+            elif [[ "$datatype" == "kmem" ]]; then
+                # Handle different memory units...
+            elif [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                    SUM_SUMMARIES[$j]=$(awk "BEGIN {print (${SUM_SUMMARIES[$j]:-0} + $value)}")
+                fi
+            fi
+            ;;
+        # Other summary types...
+    esac
 }
 ```
 
 ## Rendering System
 
-The rendering system draws the table with borders, headers, data rows, and totals.
+The rendering system draws the table with borders, headers, data rows, and summaries.
 
 ### Key Components
 
-1. **render_table_top_border**: Draws the top border
-2. **render_table_headers**: Draws the header row
-3. **render_table_separator**: Draws horizontal separators
-4. **render_data_rows**: Draws the data rows
-5. **render_totals_row**: Draws the totals row if needed
+1. **render_table_title**: Renders the title section with positioning
+2. **render_table_border**: Renders table borders (top/bottom) with element integration
+3. **render_table_top_border**: Renders the top border
+4. **render_table_headers**: Renders the header row
+5. **render_table_separator**: Renders horizontal separators
+6. **render_data_rows**: Renders the data rows with proper formatting
+7. **render_summaries_row**: Renders the summaries row if needed
+8. **render_table_bottom_border**: Renders the bottom border
+9. **render_table_footer**: Renders the footer section with positioning
 
-### Customizing Output Format
+### Title and Footer Rendering
 
-To modify the output format (e.g., to support HTML or CSV output), you would need to create new rendering functions and a switch to select the output format:
-
-1. Add an output format parameter to the configuration:
-
-```json
-{
-  "theme": "Red",
-  "output_format": "ascii",  // or "html", "csv", etc.
-  "columns": [
-    ...
-  ]
-}
-```
-
-2. Create new rendering functions for each format:
+The system supports flexible positioning of titles and footers:
 
 ```bash
-render_table_html() {
-    # HTML rendering logic
-    echo "<table>"
-    # ...
-}
-
-render_table_csv() {
-    # CSV rendering logic
-    # ...
+render_table_title() {
+    local total_table_width="$1"
+    
+    if [[ -n "$TABLE_TITLE" ]]; then
+        calculate_title_width "$TABLE_TITLE" "$total_table_width"
+        
+        local offset=0
+        case "$TITLE_POSITION" in
+            left) offset=0 ;;
+            right) offset=$((total_table_width - TITLE_WIDTH)) ;;
+            center) offset=$(((total_table_width - TITLE_WIDTH) / 2)) ;;
+            full) offset=0 ;;
+            *) offset=0 ;;
+        esac
+        
+        # Render title with appropriate positioning...
+    fi
 }
 ```
 
-3. Update the main flow to select the appropriate renderer:
+### Border Integration
+
+The border rendering system intelligently handles integration between table borders and title/footer elements:
 
 ```bash
-draw_table() {
-    # Existing code...
+render_table_border() {
+    local border_type="$1"
+    local total_table_width="$2"
+    local element_offset="$3"
+    local element_right_edge="$4"
+    local element_width="$5"
     
-    # Get output format
-    local output_format
-    output_format=$(jq -r '.output_format // "ascii"' "$layout_file")
-    
-    # Render based on format
-    case "$output_format" in
-        ascii)
-            render_table_top_border
-            render_table_headers
-            render_table_separator "middle"
-            render_data_rows "$MAX_LINES"
-            if ! render_totals_row; then
-                render_table_separator "bottom"
-            fi
-            ;;
-        html)
-            render_table_html
-            ;;
-        csv)
-            render_table_csv
-            ;;
-        *)
-            echo -e "${THEME[border_color]}Error: Unknown output format '$output_format'${THEME[text_color]}" >&2
-            return 1
-            ;;
-    esac
+    # Calculate maximum width and column positions
+    # Render border character by character with appropriate junctions
 }
 ```
 
-## Advanced Extension: Adding Column Calculations
+## Configuration System
+
+The configuration system parses and validates layout JSON files.
+
+### Key Configuration Functions
+
+1. **validate_input_files**: Check if layout and data files exist and are valid
+2. **parse_layout_file**: Extract theme, title, footer, columns, and sort information
+3. **parse_column_config**: Process column configurations
+4. **validate_column_config**: Validate column settings and print warnings
+5. **parse_sort_config**: Process sort configurations
+
+### Column Configuration Processing
+
+```bash
+parse_column_config() {
+    local columns_json="$1"
+    
+    # Clear all arrays first
+    HEADERS=()
+    KEYS=()
+    # ... other arrays
+    
+    local column_count
+    column_count=$(jq '. | length' <<<"$columns_json")
+    COLUMN_COUNT=$column_count
+    
+    for ((i=0; i<column_count; i++)); do
+        local col_json
+        col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        HEADERS[i]=$(jq -r '.header // ""' <<<"$col_json")
+        KEYS[i]=$(jq -r '.key // (.header | ascii_downcase | gsub("[^a-z0-9]"; "_"))' <<<"$col_json")
+        # ... process other column properties
+        
+        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
+    done
+}
+```
+
+## Extension Examples
+
+### Adding Column Calculations
 
 To add calculated columns that derive values from other columns:
 
@@ -405,7 +479,7 @@ To add calculated columns that derive values from other columns:
 }
 ```
 
-2. Add a calculation processor during data preparation:
+1. Add a calculation processor during data preparation:
 
 ```bash
 process_calculations() {
@@ -415,14 +489,11 @@ process_calculations() {
     for ((j=0; j<COLUMN_COUNT; j++)); do
         local calculation="${CALCULATIONS[$j]}"
         if [[ -n "$calculation" ]]; then
-            debug_log "Processing calculation for column $j: $calculation"
-            
             # Replace column keys with their values
             local calc_expr="$calculation"
             for ((k=0; k<COLUMN_COUNT; k++)); do
                 local key="${KEYS[$k]}"
                 local value=$(jq -r ".${key} // \"0\"" <<<"$row_json")
-                # Only use numeric values
                 if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
                     calc_expr=${calc_expr//$key/$value}
                 else
@@ -440,22 +511,47 @@ process_calculations() {
 }
 ```
 
-3. Update the data processing to apply calculations:
+### Adding Output Formats
+
+To support different output formats (HTML, CSV, etc.):
+
+1. Add an output format parameter to the configuration:
+
+```json
+{
+  "theme": "Red",
+  "output_format": "ascii",  // or "html", "csv", etc.
+  "columns": [...]
+}
+```
+
+1. Create new rendering functions for each format:
 
 ```bash
-process_data_rows() {
-    local data_json="$1"
+render_table_html() {
+    echo "<table class='tables-output'>"
+    echo "<thead><tr>"
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        echo "<th>${HEADERS[$i]}</th>"
+    done
+    echo "</tr></thead>"
+    echo "<tbody>"
+    # ... render data rows
+    echo "</tbody>"
+    echo "</table>"
+}
+
+render_table_csv() {
+    # Print headers
+    printf "%s" "${HEADERS[0]}"
+    for ((i=1; i<COLUMN_COUNT; i++)); do
+        printf ",%s" "${HEADERS[$i]}"
+    done
+    printf "\n"
     
-    # For each row...
-    for ((i=0; i<row_count; i++)); do
-        local row_json
-        row_json=$(jq -c ".[$i]" <<<"$data_json")
-        
-        # Apply calculations
-        row_json=$(process_calculations "$row_json")
-        
-        ROW_JSONS+=("$row_json")
-        # Rest of processing...
+    # Print data rows
+    for row_json in "${ROW_JSONS[@]}"; do
+        # ... format and print CSV row
     done
 }
 ```
@@ -467,7 +563,7 @@ For large datasets, consider these optimizations:
 1. **Batched Processing**: Process data in batches instead of all at once
 2. **Lazy Evaluation**: Only calculate values when needed
 3. **Caching**: Cache calculated values and intermediate results
-4. **Parallel Processing**: Use background processes for independent operations
+4. **Streaming**: Process data as a stream rather than loading everything into memory
 
 Example of batched processing:
 
@@ -487,52 +583,54 @@ process_data_batched() {
 
 ## Debugging and Testing
 
-To debug and test new extensions:
+### Debug Mode
 
-1. Use the `--debug` flag to enable detailed logging:
+Use the `--debug` flag to enable detailed logging:
 
 ```bash
 ./tables.sh layout.json data.json --debug
 ```
 
-2. Create test cases for your extensions:
+Debug messages are sent to stderr and include:
+
+- Configuration parsing details
+- Data processing steps
+- Width calculations
+- Rendering decisions
+
+### Test Framework
+
+The `tst/` directory contains test files that demonstrate various features:
+
+- `tables_test_01_basic.sh`: Basic functionality tests
+- `tables_test_03_titles.sh`: Title positioning tests
+- `tables_test_05_footers.sh`: Footer positioning tests
+
+### Creating Test Cases
 
 ```bash
-test_percentage_datatype() {
-    cat > test_percentage_layout.json << 'EOF'
+test_new_feature() {
+    cat > test_layout.json << 'EOF'
     {
+      "theme": "Red",
       "columns": [
         {
-          "header": "NAME",
-          "key": "name",
-          "datatype": "text"
-        },
-        {
-          "header": "PERCENTAGE",
-          "key": "percentage",
-          "datatype": "percentage",
-          "justification": "right"
+          "header": "TEST",
+          "key": "test_value",
+          "datatype": "your_new_datatype"
         }
       ]
     }
     EOF
     
-    cat > test_percentage_data.json << 'EOF'
+    cat > test_data.json << 'EOF'
     [
-      {"name": "Item A", "percentage": "25%"},
-      {"name": "Item B", "percentage": "50%"}
+      {"test_value": "sample_data"}
     ]
     EOF
     
-    draw_table test_percentage_layout.json test_percentage_data.json
+    ./tables.sh test_layout.json test_data.json --debug
 }
-```
-
-3. Run your tests:
-
-```bash
-# Add to the main script or test script
-test_percentage_datatype
 ```
 
 ## Best Practices for Extensions
@@ -543,11 +641,22 @@ test_percentage_datatype
 4. **Error Handling**: Include proper validation and error messages
 5. **Performance**: Consider the impact on performance, especially for large datasets
 6. **Testing**: Create test cases to verify functionality
+7. **Modular Design**: Keep extensions in appropriate modules (lib/ files)
 
 ## Common Pitfalls
 
 1. **Shell Limitations**: Remember that Bash has limited mathematical capabilities; use `awk` for complex math
 2. **Quoting**: Be careful with variable quoting to handle spaces and special characters
 3. **Escaping**: Properly escape characters in regular expressions and JSON
-4. **Portability**: Test on different terminal types and shells if portability is important
-5. **Error Propagation**: Ensure errors are properly reported up the call stack
+4. **Global Variables**: Be careful with global variable scope and initialization
+5. **Array Indexing**: Bash arrays are zero-indexed; ensure consistent indexing
+6. **Error Propagation**: Ensure errors are properly reported up the call stack
+7. **ANSI Sequences**: Remember that ANSI color codes affect string length calculations
+
+## Version History
+
+- **1.0.2**: Added help functionality and version history section
+- **1.0.1**: Fixed shellcheck issues (SC2004, SC2155)
+- **1.0.0**: Initial release with table rendering functionality
+
+The current implementation includes title/footer support, enhanced theming, the `num` datatype with thousands separators, and comprehensive summary calculations.
