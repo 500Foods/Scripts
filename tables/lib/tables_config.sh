@@ -145,13 +145,16 @@ parse_column_config() {
         WRAP_MODES[i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         WRAP_CHARS[i]=$(jq -r '.wrap_char // ""' <<<"$col_json")
         PADDINGS[i]=$(jq -r '.padding // '"$DEFAULT_PADDING" <<<"$col_json")
-        local visible_raw=$(jq -r '.visible // true' <<<"$col_json")
+	local visible_raw
+        visible_raw=$(jq -r '.visible // true' <<<"$col_json")
         debug_log "Column $i: Raw visible value from JSON: $visible_raw"
         # Check if visible key exists in JSON to debug potential mismatch
-        local visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
+	local visible_key_check
+        visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
         debug_log "Column $i: Does 'visible' key exist in JSON? $visible_key_check"
         if [[ "$visible_key_check" == "true" ]]; then
-            local visible_value=$(jq -r '.visible' <<<"$col_json")
+	    local visible_value
+            visible_value=$(jq -r '.visible' <<<"$col_json")
             debug_log "Column $i: Explicit visible value (if key exists): $visible_value"
             VISIBLES[i]="$visible_value"
         else
