@@ -3,7 +3,7 @@
 # sync_all.sh
 # Usage: sync_all.sh <repo_list_file>
 # Example: sync_all.sh ~/repos.txt
-# Runs githubsync.sh for all repos in the specified repo list, logs, and emails HTML summary
+# Runs github-sync.sh for all repos in the specified repo list, logs, and emails HTML summary
 
 # Configuration
 GITHUBSYNC_PATH="/fvl/git/scr/github-sync.sh"  # Path to githubsync.sh
@@ -58,7 +58,7 @@ fi
 
 # Validate githubsync path
 if [ ! -x "$GITHUBSYNC_PATH" ]; then
-    echo "Error: githubsync.sh at '$GITHUBSYNC_PATH' does not exist or is not executable." >&2
+    echo "Error: github-sync.sh at '$GITHUBSYNC_PATH' does not exist or is not executable." >&2
     exit 1
 fi
 
