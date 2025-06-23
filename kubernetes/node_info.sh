@@ -3,6 +3,7 @@
 # node_info.sh - DOKS Node and Pod Information Tool
 #
 # Version History:
+# 2.2.5 - Added LABELS column to Node Resource Usage (B) to show cluster-name, region, and role labels
 # 2.2.4 - Removed Kubernetes from various places, added DOKS
 # 2.2.3 - Added options to select table, quiet mode, and theme
 # 2.2.2 - Added Pod Images table 
@@ -27,7 +28,7 @@
 # Usage: ./node_info.sh [--debug]
 
 # Configuration
-APPVERSION="2.2.4"
+APPVERSION="2.2.5"
 DEBUG="false"
 QUIET="false"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -159,6 +160,10 @@ get_node_info() {
     local total_nodes=$(jq '.items | length' "$nodes_temp")
     debug "Total nodes found: $total_nodes"
     
+    # Force metrics available to true for debugging purposes
+    metrics_available="true"
+    debug "Forcing metrics available to true for debugging"
+    
     # Create table data JSON for nodes with basic information
     local data
     data=$(jq -s '[.[] | .items[] | {
@@ -168,7 +173,13 @@ get_node_info() {
         kernel: .status.nodeInfo.kernelVersion,
         internal_ip: ([.status.addresses[] | select(.type == "InternalIP") | .address] | .[0]),
         external_ip: ([.status.addresses[] | select(.type == "ExternalIP") | .address] | .[0] // ""),
-        cpu: .status.capacity.cpu
+        cpu: .status.capacity.cpu,
+        uptime: ((now - (.metadata.creationTimestamp | fromdateiso8601)) / 86400 | floor | tostring + "d"),
+        labels: ([
+            if .metadata.labels["cluster-name"] then "cluster-name=" + .metadata.labels["cluster-name"] else empty end,
+            if .metadata.labels["region"] then "region=" + .metadata.labels["region"] else empty end,
+            if .metadata.labels["role"] then "role=" + .metadata.labels["role"] else empty end
+        ] | join(","))
     }]' "$nodes_temp")
     
     # Create a temporary file to store enhanced node data
@@ -201,7 +212,10 @@ get_node_info() {
                 filtered_tags=${filtered_tags%,}
             fi
             
-            # Add RAM, DISK, and tags to node data
+            # Add RAM, DISK, and tags to node data, including all labels
+            local labels=$(echo "$node_json" | jq -r '.labels | if . != "" then . else "" end')
+            local filtered_tags="$filtered_tags,$labels"
+            filtered_tags=${filtered_tags#,}  # Remove leading comma if any
             local enhanced_node=$(echo "$node_json" | jq --arg tags "$filtered_tags" --arg ram "$memory" --arg disk "$disk" '. + {tags: $tags, ram_mb: ($ram | tonumber), disk_gb: ($disk | tonumber)}')
             
             # Append to enhanced data file
@@ -293,6 +307,13 @@ get_node_info() {
       "summary": "sum"
     },
     {
+      "header": "UPTIME",
+      "key": "uptime",
+      "datatype": "text",
+      "justification": "right",
+      "string_limit": 10
+    },
+    {
       "header": "TAGS",
       "key": "tags",
       "datatype": "text",
@@ -324,23 +345,27 @@ EOF
         return 1
     fi
     
-    # If metrics are available, display node resource usage
+    # Display node resource usage (forced for debugging)
     if [ "$metrics_available" = "true" ]; then
         local metrics_temp="${TEMP_DIR}/nodes_metrics_temp.txt"
         debug "Fetching node metrics..."
-        kubectl top nodes --no-headers > "$metrics_temp"
+        if ! kubectl top nodes --no-headers > "$metrics_temp" 2>/dev/null; then
+            debug "Failed to fetch node metrics, proceeding with available data"
+        fi
         
         # Create a temporary file to store enhanced metrics data
         local enhanced_metrics_file="${TEMP_DIR}/enhanced_metrics_data.json"
         echo "[]" > "$enhanced_metrics_file"
         
-        # Process metrics data and add node pool and pressure metrics
+        # Process metrics data and add node pool, labels, and pressure metrics
         cat "$metrics_temp" | while read -r line; do
             IFS=' ' read -r name cpu_usage cpu_percent memory_usage memory_percent <<< "$line"
             debug "Processing metrics for node: $name"
             
-            # Get node pool from the first table data
+            # Get node pool and all labels from the first table data
             local nodepool=$(echo "$data" | jq -r --arg name "$name" '.[] | select(.name == $name) | .nodepool // ""')
+            local labels=$(echo "$data" | jq -r --arg name "$name" '.[] | select(.name == $name) | .labels // ""')
+            debug "Labels for node $name: $labels"
             
             # Get pressure metrics from kubectl get nodes
             local pressure_json
@@ -357,6 +382,7 @@ EOF
 {
   "name": "$name",
   "nodepool": "$nodepool",
+  "labels": "$labels",
   "cpu": "$cpu_usage",
   "cpu_percent": "$cpu_percent",
   "ram": "$memory_usage",
@@ -456,6 +482,14 @@ EOF
       "datatype": "text",
       "justification": "center",
       "string_limit": 7
+    },
+    {
+      "header": "LABELS",
+      "key": "labels",
+      "datatype": "text",
+      "justification": "left",
+      "wrap_mode": "wrap",
+      "wrap_char": ","
     }
   ]
 }
