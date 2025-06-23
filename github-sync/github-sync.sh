@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# githubsync.sh
+# github-sync.sh
 # 
 # 2025-06-08 20:44
 #
@@ -10,7 +10,7 @@
 # Reports zero pushes/pulls if no tracked or unignored files have changed.
 
 # Default log directory and debug mode
-LOG_DIR="$HOME/githubsync_logs"
+LOG_DIR="$HOME/github_sync_logs"
 DEBUG=false
 
 # Parse arguments
@@ -63,7 +63,7 @@ fi
 
 GITHUB_URL="git@github.com:$REPO.git"
 REPO_SAFE=$(echo "$REPO" | tr '/' '-')
-LOGFILE="$LOG_DIR/githubsync_${REPO_SAFE}_$(date +%Y%m%d_%H%M%S).log"
+LOGFILE="$LOG_DIR/github_sync_${REPO_SAFE}_$(date +%Y%m%d_%H%M%S).log"
 START_TIME=$(date +%s)
 
 # Create log directory

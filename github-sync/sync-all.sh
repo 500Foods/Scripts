@@ -6,7 +6,7 @@
 # Runs githubsync.sh for all repos in the specified repo list, logs, and emails HTML summary
 
 # Configuration
-GITHUBSYNC_PATH="/fvl/git/scr/githubsync.sh"  # Path to githubsync.sh
+GITHUBSYNC_PATH="/fvl/git/scr/github-sync.sh"  # Path to githubsync.sh
 EMAIL="willard@500foods.com"                    # Email address for summary
 LOG_DIR="/fvl/git/log"                          # Log directory
 MUTT_CMD="mutt"                                  # Mutt command
@@ -219,17 +219,25 @@ cat << EOF > "$HTML_FILE"
         </tr>
 EOF
 
-# Add table rows with inlined zebra striping (every 4th row)
+# Add table rows with conditional highlighting for non-zero Pushed or Pulled, and zebra striping
 ROW_NUM=0
 while IFS='|' read -r timestamp age activity repo access path size pushes pulls duration result; do
     # Only process lines with valid repo data
     if [[ -n "$repo" ]]; then
         ((ROW_NUM++))
-        # Apply zebra striping inline (every 4th row)
-        if [ $((ROW_NUM % 4)) -eq 0 ]; then
-            echo "        <tr style=\"background-color: #f0f0f0;\"><td>$timestamp</td><td class=\"right\">$age</td><td class=\"right\">$activity</td><td><a href=\"https://github.com/$repo\">$repo</a></td><td>$access</td><td>$path</td><td class=\"right\">$size</td><td class=\"right\">$pushes</td><td class=\"right\">$pulls</td><td>$duration</td><td>$result</td></tr>" >> "$HTML_FILE"
+        # Remove any formatting from pushes and pulls for numeric comparison
+        PUSHES_NUM=$(echo "$pushes" | sed 's/[^0-9]//g')
+        PULLS_NUM=$(echo "$pulls" | sed 's/[^0-9]//g')
+        # Check if Pushed or Pulled is non-zero for highlighting
+        if [ "$PUSHES_NUM" -gt 0 ] || [ "$PULLS_NUM" -gt 0 ]; then
+            echo "        <tr style=\"background-color: #fffde7;\"><td>$timestamp</td><td class=\"right\">$age</td><td class=\"right\">$activity</td><td><a href=\"https://github.com/$repo\">$repo</a></td><td>$access</td><td>$path</td><td class=\"right\">$size</td><td class=\"right\">$pushes</td><td class=\"right\">$pulls</td><td>$duration</td><td>$result</td></tr>" >> "$HTML_FILE"
         else
-            echo "        <tr><td>$timestamp</td><td class=\"right\">$age</td><td class=\"right\">$activity</td><td><a href=\"https://github.com/$repo\">$repo</a></td><td>$access</td><td>$path</td><td class=\"right\">$size</td><td class=\"right\">$pushes</td><td class=\"right\">$pulls</td><td>$duration</td><td>$result</td></tr>" >> "$HTML_FILE"
+            # Apply zebra striping inline (every 4th row) for rows without activity
+            if [ $((ROW_NUM % 4)) -eq 0 ]; then
+                echo "        <tr style=\"background-color: #f0f0f0;\"><td>$timestamp</td><td class=\"right\">$age</td><td class=\"right\">$activity</td><td><a href=\"https://github.com/$repo\">$repo</a></td><td>$access</td><td>$path</td><td class=\"right\">$size</td><td class=\"right\">$pushes</td><td class=\"right\">$pulls</td><td>$duration</td><td>$result</td></tr>" >> "$HTML_FILE"
+            else
+                echo "        <tr><td>$timestamp</td><td class=\"right\">$age</td><td class=\"right\">$activity</td><td><a href=\"https://github.com/$repo\">$repo</a></td><td>$access</td><td>$path</td><td class=\"right\">$size</td><td class=\"right\">$pushes</td><td class=\"right\">$pulls</td><td>$duration</td><td>$result</td></tr>" >> "$HTML_FILE"
+            fi
         fi
     fi
 done < "$SUMMARY_FILE"
