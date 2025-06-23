@@ -42,7 +42,8 @@ These scripts help with PostgreSQL database operations:
 
 These tools help manage GitHub repositories:
 
-- [GitHubSync](https://github.com/500Foods/Scripts/blob/main/github-sync/github-sync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
+- [GitHub-Sitemap](https://github.com/500Foods/Scripts/blob/main/github-sitemap/github-sitemap.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
+- [GitHub-Sync](https://github.com/500Foods/Scripts/blob/main/github-sync/github-sync.md) - Sync GitHub repositories with local copies, mostly intended as a backup mechanism (BASH)
 - [CLOC](https://github.com/500Foods/Scripts/blob/main/cloc/cloc.md) - Add "count lines of code" to the README.md of a GitHub repository (GitHub Action)
 
 ## Repository Information
