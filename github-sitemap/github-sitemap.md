@@ -32,9 +32,11 @@ To use `github-sitemap.sh` in your own GitHub repository, follow these steps:
 2. **Place the Script in Your Repository**: Copy `github-sitemap.sh` to a suitable location within your repository, such as a `scripts/` or `tools/` directory.
 3. **Make It Executable**: Run `chmod +x github-sitemap.sh` to ensure the script can be executed on Unix-like systems (Linux, macOS).
 4. **Run the Script**: Execute the script from the command line. You can specify a directory to analyze or let it default to the current directory:
+
    ```bash
    ./github-sitemap.sh [directory]
    ```
+
    - Replace `[directory]` with the path to the directory containing your markdown files if you want to analyze a specific subset of your repository.
 5. **Review the Output**: The script will display a summary of its findings, including counts of broken links and orphaned files. If tables are enabled, it will show detailed lists. Check the optional report file (e.g., `sitemap_report.txt`) if you did not use the `--noreport` option.
 6. **Customize Behavior with Options**: Use command-line flags to tailor the script's operation to your needs:
@@ -43,9 +45,11 @@ To use `github-sitemap.sh` in your own GitHub repository, follow these steps:
    - `--noreport`: Prevent the creation of a report file.
    - `--theme Red` or `--theme Blue`: Choose a color scheme for table output.
    Example:
+
    ```bash
    ./github-sitemap.sh --theme Blue --quiet
    ```
+
 7. **Integrate into Workflows**: Consider adding the script to your CI/CD pipeline or a cron job to regularly check documentation integrity. For example, you could create a GitHub Action to run the script on every push or pull request to catch issues early.
 
 ## Requirements
@@ -64,7 +68,7 @@ To use `github-sitemap.sh` in your own GitHub repository, follow these steps:
 
 When run, the script might produce output like this (simplified for brevity):
 
-```
+```bash
 Analyzing markdown files in ./docs...
 Total Files: 25
 Broken Links: 3
