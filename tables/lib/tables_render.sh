@@ -148,10 +148,17 @@ render_table_border() {
             max_width=$adjusted_element_width
         fi
     fi
-    # Ensure max_width does not exceed the width of visible content plus borders
+    # For top border with a title or bottom border with a footer, allow max_width to extend to element width if wider
     local visible_content_width=$((total_table_width + 2))
-    if [[ $max_width -gt $visible_content_width ]]; then
-        max_width=$visible_content_width
+    if [[ -n "$element_width" && $element_width -gt 0 ]]; then
+        local adjusted_element_width=$((element_width + 2))
+        if [[ $adjusted_element_width -gt $visible_content_width ]]; then
+            max_width=$adjusted_element_width
+        fi
+    else
+        if [[ $max_width -gt $visible_content_width ]]; then
+            max_width=$visible_content_width
+        fi
     fi
     
     debug_log "Max width for $border_type border: $max_width"
@@ -200,15 +207,15 @@ render_table_border() {
             fi
         elif [[ $i -eq $((total_table_width + 1)) && $i -lt $((max_width - 1)) ]]; then
             # Right edge of table when header/footer is wider
-            if [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -gt $((total_table_width - 1)) ]]; then
-                # Header/footer is wider than the table
-                if [[ "$border_type" == "top" ]]; then
-                    # For top border with header wider than table, use top junction
-                    char_to_print="${THEME[t_junct]}"
-                else
-                    # For bottom border with footer wider than table, use bottom junction
-                    char_to_print="${THEME[b_junct]}"
-                fi
+                if [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -gt $((total_table_width - 1)) ]]; then
+                    # Header/footer is wider than the table
+                    if [[ "$border_type" == "top" ]]; then
+                        # For top border with header wider than table, use top junction
+                        char_to_print="${THEME[t_junct]}"
+                    else
+                        # For bottom border with footer wider than table, use bottom junction to connect to table
+                        char_to_print="${THEME[b_junct]}"
+                    fi
             else
                 char_to_print="${THEME[r_junct]}"
             fi

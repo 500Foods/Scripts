@@ -20,6 +20,7 @@
 declare -r TABLES_VERSION="1.0.2"
 
 # VERSION HISTORY
+# 1.0.4 - Fixed border rendering for titles and footers wider than the table
 # 1.0.3 - Visible: false columns are now excluded from width calculations
 # 1.0.2 - Added help functionality and version history section
 # 1.0.1 - Fixed shellcheck issues (SC2004, SC2155)
