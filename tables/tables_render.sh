@@ -469,7 +469,10 @@ render_table_separator() {
 render_data_rows() {
     local max_lines="$1"
     debug_log "================ RENDERING DATA ROWS ================"
-    debug_log "Rendering ${#ROW_JSONS[@]} rows with max_lines=$max_lines"
+    debug_log "Rendering ${#DATA_ROWS[@]} rows with max_lines=$max_lines"
+    if [[ ${#DATA_ROWS[@]} -eq 0 ]]; then
+        debug_log "WARNING: No data rows to render. Check data loading."
+    fi
     
     # Initialize last break values
     local last_break_values=()
@@ -478,16 +481,18 @@ render_data_rows() {
     done
     
     # Process each row in order
-    for ((row_idx=0; row_idx<${#ROW_JSONS[@]}; row_idx++)); do
-        local row_json="${ROW_JSONS[$row_idx]}"
-        debug_log "Rendering row $row_idx: $row_json"
+    for ((row_idx=0; row_idx<${#DATA_ROWS[@]}; row_idx++)); do
+        debug_log "Rendering row $row_idx from memory"
         
+        eval "${DATA_ROWS[$row_idx]}"
+        debug_log "Row data keys: ${!row_data[*]}"
+        debug_log "Row data values: ${row_data[*]}"
         # Check if we need a break
         local needs_break=false
         for ((j=0; j<COLUMN_COUNT; j++)); do
             if [[ "${BREAKS[$j]}" == "true" ]]; then
                 local key="${KEYS[$j]}" value
-                value=$(jq -r ".${key} // \"\"" <<<"$row_json")
+                value="${row_data[$key]}"
                 if [[ -n "${last_break_values[$j]}" && "$value" != "${last_break_values[$j]}" ]]; then
                     needs_break=true
                     break
@@ -504,7 +509,7 @@ render_data_rows() {
         local row_line_count=1
         for ((j=0; j<COLUMN_COUNT; j++)); do
             local key="${KEYS[$j]}" value
-            value=$(jq -r ".${key} // null" <<<"$row_json")
+            value="${row_data[$key]}"
             
             local display_value
             display_value=$(format_display_value "$value" "${NULL_VALUES[j]}" "${ZERO_VALUES[j]}" "${DATATYPES[j]}" "${FORMATS[j]}" "${STRING_LIMITS[j]}" "${WRAP_MODES[j]}" "${WRAP_CHARS[j]}")
@@ -632,7 +637,7 @@ render_data_rows() {
         for ((j=0; j<COLUMN_COUNT; j++)); do
             if [[ "${BREAKS[$j]}" == "true" ]]; then
                 local key="${KEYS[$j]}" value
-                value=$(jq -r ".${key} // \"\"" <<<"$row_json")
+                value="${row_data[$key]}"
                 last_break_values[j]="$value"
             fi
         done

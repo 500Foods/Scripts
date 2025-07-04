@@ -210,15 +210,13 @@ draw_table() {
     initialize_summaries
     
     # Read and prepare data
-    local data_json
-    data_json=$(prepare_data "$data_file")
+    prepare_data "$data_file"
     
     # Sort data if specified
-    local sorted_data
-    sorted_data=$(sort_data "$data_json")
+    sort_data
     
     # Process data rows, update widths and calculate summaries
-    process_data_rows "$sorted_data"
+    process_data_rows
     
     debug_log "================ RENDERING TABLE ================"
     debug_log "Final column widths: ${WIDTHS[*]}"

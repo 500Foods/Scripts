@@ -14,6 +14,9 @@ declare -A AVG_SUMMARIES=()
 declare -A AVG_COUNTS=()
 declare -a IS_WIDTH_SPECIFIED=()
 
+# Global array to store data rows as associative arrays
+declare -a DATA_ROWS=()
+
 # initialize_summaries: Initialize summaries storage
 initialize_summaries() {
     debug_log "Initializing summaries storage"
@@ -40,7 +43,7 @@ initialize_summaries() {
 
 # prepare_data: Read and validate data from JSON file
 # Args: data_file
-# Returns: valid data JSON
+# Side effect: Populates DATA_ROWS
 prepare_data() {
     local data_file="$1"
     debug_log "Preparing data from file: $data_file"
@@ -48,44 +51,37 @@ prepare_data() {
     local data_json
     data_json=$(jq -c '. // []' "$data_file")
     
-    local temp_data_file
-    temp_data_file=$(mktemp)
-    echo "[" > "$temp_data_file"
-    
     local row_count
     row_count=$(jq '. | length' <<<"$data_json")
-    local valid_rows=0
     debug_log "Data row count: $row_count"
     
+    # Clear previous data
+    DATA_ROWS=()
+    
+    # Load all data into Bash arrays
     for ((i=0; i<row_count; i++)); do
         local row_json
         row_json=$(jq -c ".[$i]" <<<"$data_json")
-        debug_log "Row $i: $row_json"
-        
-        if [[ $i -gt 0 && $valid_rows -gt 0 ]]; then
-            echo "," >> "$temp_data_file"
-        fi
-        echo "$row_json" >> "$temp_data_file"
-        ((valid_rows++))
+        declare -A row_data
+        for key in "${KEYS[@]}"; do
+            local value
+            value=$(jq -r ".${key} // null" <<<"$row_json")
+            row_data["$key"]="$value"
+        done
+        DATA_ROWS[$i]=$(declare -p row_data)
+        debug_log "Loaded row $i into memory"
     done
-    
-    echo "]" >> "$temp_data_file"
-    debug_log "Valid rows count: $valid_rows"
-    
-    cat "$temp_data_file"
-    rm -f "$temp_data_file"
+    debug_log "After loading, DATA_ROWS length: ${#DATA_ROWS[@]}"
 }
 
 # sort_data: Apply sorting to data
-# Args: data_json
-# Returns: sorted data JSON
+# Side effect: Updates DATA_ROWS if sorting is applied
 sort_data() {
-    local data_json="$1"
     debug_log "Sorting data"
+    debug_log "DATA_ROWS length before processing sort: ${#DATA_ROWS[@]}"
     
     if [[ ${#SORT_KEYS[@]} -eq 0 ]]; then
         debug_log "No sort keys defined, skipping sort"
-        echo "$data_json"
         return
     fi
     
@@ -104,9 +100,28 @@ sort_data() {
     debug_log "JQ sort expression: $jq_sort"
     
     if [[ -n "$jq_sort" ]]; then
+        # Create a temporary JSON file from DATA_ROWS
         local temp_data_file
         temp_data_file=$(mktemp)
-        echo "$data_json" > "$temp_data_file"
+        local json_data="["$'\n'
+        for ((i=0; i<${#DATA_ROWS[@]}; i++)); do
+            eval "${DATA_ROWS[$i]}"
+            local row_json="{"
+            for key in "${KEYS[@]}"; do
+                local value="${row_data[$key]}"
+                if [[ "$value" == "null" ]]; then
+                    row_json+="\"$key\": null"
+                else
+                    row_json+="\"$key\": \"$value\""
+                fi
+                [[ $key != "${KEYS[-1]}" ]] && row_json+=", "
+            done
+            row_json+="}"
+            [[ $i -lt $(( ${#DATA_ROWS[@]} - 1 )) ]] && row_json+=","
+            json_data+="$row_json"$'\n'
+        done
+        json_data+="]"
+        echo "$json_data" > "$temp_data_file"
         
         local sorted_data
         sorted_data=$(jq -c "sort_by($jq_sort)" "$temp_data_file" 2>/tmp/jq_stderr.$$)
@@ -118,28 +133,42 @@ sort_data() {
             echo -e "${THEME[border_color]}Error: Sorting failed${THEME[text_color]}" >&2
             cat /tmp/jq_stderr.$$ >&2
             rm -f /tmp/jq_stderr.$$
-            echo "$data_json"  # Return original data on error
         else
             debug_log "Data sorted successfully"
-            echo "$sorted_data"
+            # Update DATA_ROWS based on sorted data
+            local sorted_row_count
+            sorted_row_count=$(jq '. | length' <<<"$sorted_data")
+            DATA_ROWS=()
+            for ((i=0; i<sorted_row_count; i++)); do
+                local row_json
+                row_json=$(jq -c ".[$i]" <<<"$sorted_data")
+                declare -A row_data
+                for key in "${KEYS[@]}"; do
+                    local value
+                    value=$(jq -r ".${key} // null" <<<"$row_json")
+                    row_data["$key"]="$value"
+                done
+                DATA_ROWS[$i]=$(declare -p row_data)
+                debug_log "Loaded sorted row $i into memory"
+            done
         fi
-    else
-        echo "$data_json"
     fi
 }
 
 # process_data_rows: Process data rows, update widths and calculate summaries
-# Args: data_json
 # Side effect: Updates global MAX_LINES
 process_data_rows() {
-    local data_json="$1"
+    debug_log "DATA_ROWS length before processing: ${#DATA_ROWS[@]}"
     
     local row_count
     MAX_LINES=1
-    row_count=$(jq '. | length' <<<"$data_json")
+    row_count=${#DATA_ROWS[@]}
     
     debug_log "================ DATA PROCESSING ================"
-    debug_log "Processing $row_count rows of data"
+    debug_log "Processing $row_count rows of data from DATA_ROWS (length: ${#DATA_ROWS[@]})"
+    if [[ $row_count -eq 0 ]]; then
+        debug_log "WARNING: No data rows loaded. Check data file or input."
+    fi
     debug_log "Number of columns: $COLUMN_COUNT"
     debug_log "Column headers: ${HEADERS[*]}"
     debug_log "Column keys: ${KEYS[*]}"
@@ -150,10 +179,12 @@ process_data_rows() {
     
     for ((i=0; i<row_count; i++)); do
         local row_json line_count=1
-        row_json=$(jq -c ".[$i]" <<<"$data_json")
+        # Create a dummy JSON for compatibility, but we'll use DATA_ROWS for processing
+        row_json="{\"row\":$i}"
         ROW_JSONS+=("$row_json")
-        debug_log "Processing row $i: $row_json"
+        debug_log "Processing row $i from memory"
         
+        eval "${DATA_ROWS[$i]}"
         for ((j=0; j<COLUMN_COUNT; j++)); do
             local key="${KEYS[$j]}" 
             local datatype="${DATATYPES[$j]}" 
@@ -165,7 +196,7 @@ process_data_rows() {
             local format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
             local value
             
-            value=$(jq -r ".${key} // null" <<<"$row_json")
+            value="${row_data[$key]}"
             value=$("$validate_fn" "$value")
             local display_value
             display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
@@ -311,7 +342,7 @@ process_data_rows() {
     
     debug_log "Final column widths after summary adjustment: ${WIDTHS[*]}"
     debug_log "Max lines per row: $MAX_LINES"
-    debug_log "Total rows to render: ${#ROW_JSONS[@]}"
+    debug_log "Total rows to render: ${#ROW_JSONS[@]} (DATA_ROWS length: ${#DATA_ROWS[@]})"
 }
 
 # update_summaries: Update summaries for a column
