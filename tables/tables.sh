@@ -39,7 +39,7 @@ format_with_commas() {
     local num="$1"
     # Use bash parameter expansion to add commas
     local result="$num"
-    while [[ $result =~ ^([0-9]+)([0-9]{3}) ]]; do
+    while [[ $result =~ ^([0-9]+)([0-9]{3}.*) ]]; do
         result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
     done
     echo "$result"
@@ -963,6 +963,120 @@ draw_table() {
     render_table_bottom_border
     [[ -n "$TABLE_FOOTER" ]] && render_table_footer "$total_table_width"
 }
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+# Main function for command-line usage
+tables_main() {
     draw_table "$@"
+}
+
+# Convenience function to render a table from files
+tables_render() {
+    local layout_file="$1" data_file="$2"
+    shift 2
+    draw_table "$layout_file" "$data_file" "$@"
+}
+
+# Function to render a table from JSON strings (useful when sourced)
+tables_render_from_json() {
+    local layout_json="$1" data_json="$2"
+    shift 2
+    
+    # Create temporary files
+    local temp_layout temp_data
+    temp_layout=$(mktemp)
+    temp_data=$(mktemp)
+    
+    # Ensure cleanup on exit
+    trap 'rm -f "$temp_layout" "$temp_data"' RETURN
+    
+    # Write JSON to temp files
+    echo "$layout_json" > "$temp_layout"
+    echo "$data_json" > "$temp_data"
+    
+    # Render the table
+    draw_table "$temp_layout" "$temp_data" "$@"
+}
+
+# Function to get available themes
+tables_get_themes() {
+    echo "Available themes: Red, Blue"
+}
+
+# Function to get version
+tables_version() {
+    echo "$TABLES_VERSION"
+}
+
+# Function to reset all global state (useful when sourced)
+tables_reset() {
+    COLUMN_COUNT=0
+    MAX_LINES=1
+    THEME_NAME="Red"
+    TABLE_TITLE=""
+    TITLE_WIDTH=0
+    TITLE_POSITION="none"
+    TABLE_FOOTER=""
+    FOOTER_WIDTH=0
+    FOOTER_POSITION="none"
+    
+    # Reset arrays
+    HEADERS=()
+    KEYS=()
+    JUSTIFICATIONS=()
+    DATATYPES=()
+    NULL_VALUES=()
+    ZERO_VALUES=()
+    FORMATS=()
+    SUMMARIES=()
+    BREAKS=()
+    STRING_LIMITS=()
+    WRAP_MODES=()
+    WRAP_CHARS=()
+    PADDINGS=()
+    WIDTHS=()
+    SORT_KEYS=()
+    SORT_DIRECTIONS=()
+    SORT_PRIORITIES=()
+    IS_WIDTH_SPECIFIED=()
+    VISIBLES=()
+    ROW_JSONS=()
+    DATA_ROWS=()
+    
+    # Reset associative arrays
+    SUM_SUMMARIES=()
+    COUNT_SUMMARIES=()
+    MIN_SUMMARIES=()
+    MAX_SUMMARIES=()
+    UNIQUE_VALUES=()
+    AVG_SUMMARIES=()
+    AVG_COUNTS=()
+    
+    # Reset theme to default
+    get_theme "$THEME_NAME"
+}
+
+# Export main functions for use when sourced
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    # Script is being sourced
+    export -f tables_render
+    export -f tables_render_from_json
+    export -f tables_get_themes
+    export -f tables_version
+    export -f tables_reset
+    export -f draw_table
+    
+    # Also export some utility functions that might be useful
+    export -f get_theme
+    export -f format_with_commas
+    export -f get_display_length
+    
+    echo "Tables library loaded. Available functions:"
+    echo "  tables_render <layout_file> <data_file> [options]"
+    echo "  tables_render_from_json <layout_json> <data_json> [options]"
+    echo "  tables_get_themes"
+    echo "  tables_version"
+    echo "  tables_reset"
+    echo "  draw_table <layout_file> <data_file> [options]"
+else
+    # Script is being run directly
+    tables_main "$@"
 fi
