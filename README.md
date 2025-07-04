@@ -51,27 +51,26 @@ These tools help manage GitHub repositories:
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2025-07-04 16:34:41 UTC
---------------------------------------------------------------------------------
-Language                      files          blank        comment           code
---------------------------------------------------------------------------------
-Bourne Shell                     32           1198           1211          10591
-Markdown                         20           1345              4           3651
-Bourne Again Shell                1             34             62            591
-Text                              3             24              0            172
-XML                               4              0              0            124
-Python                            4             56              1            112
-YAML                              3             16             26             72
-SQL                               1              6              5             38
-JSON                              1              0              0              2
---------------------------------------------------------------------------------
-SUM:                             69           2679           1309          15353
---------------------------------------------------------------------------------
-15 Files were skipped (duplicate, binary, or without source code):
-  txt: 11
+Last updated at 2025-07-04 17:53:17 UTC
+-------------------------------------------------------------------------------
+Language                     files          blank        comment           code
+-------------------------------------------------------------------------------
+Bourne Shell                    32           1196           1213          11124
+Markdown                        20           1345              4           3652
+XML                              4              0              0            124
+Python                           4             56              1            112
+YAML                             3             16             26             72
+Text                             1             14              0             52
+SQL                              1              6              5             38
+JSON                             1              0              0              2
+-------------------------------------------------------------------------------
+SUM:                            66           2633           1249          15176
+-------------------------------------------------------------------------------
+5 Files were skipped (duplicate, binary, or without source code):
   gitignore: 2
   gitattributes: 1
   license: 1
+  txt: 1
 ```
 <!--CLOC-END-->
 
