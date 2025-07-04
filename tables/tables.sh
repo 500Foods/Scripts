@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source remaining library modules
 # source "$SCRIPT_DIR/tables_datatypes.sh" # Integrated
 # source "$SCRIPT_DIR/tables_config.sh" # Integrated
-source "$SCRIPT_DIR/tables_data.sh"
+# source "$SCRIPT_DIR/tables_data.sh" # Integrated
 source "$SCRIPT_DIR/tables_render.sh"
 
 # THEMES SECTION
@@ -269,6 +269,221 @@ parse_sort_config() {
         [[ -z "${SORT_KEYS[$i]}" ]] && echo -e "${THEME[border_color]}Warning: Sort item $i has no key, ignoring${THEME[text_color]}" >&2 && continue
         [[ "${SORT_DIRECTIONS[$i]}" != "asc" && "${SORT_DIRECTIONS[$i]}" != "desc" ]] && echo -e "${THEME[border_color]}Warning: Invalid sort direction '${SORT_DIRECTIONS[$i]}' for key ${SORT_KEYS[$i]}, using 'asc'${THEME[text_color]}" >&2 && SORT_DIRECTIONS[i]="asc"
     done
+}
+
+# DATA SECTION (from tables_data.sh)
+# Global arrays for data storage and summaries
+declare -a ROW_JSONS=()
+declare -A SUM_SUMMARIES=() COUNT_SUMMARIES=() MIN_SUMMARIES=() MAX_SUMMARIES=()
+declare -A UNIQUE_VALUES=() AVG_SUMMARIES=() AVG_COUNTS=()
+declare -a IS_WIDTH_SPECIFIED=()
+declare -a DATA_ROWS=()
+
+# initialize_summaries: Initialize summaries storage
+initialize_summaries() {
+    debug_log "Initializing summaries storage"
+    SUM_SUMMARIES=(); COUNT_SUMMARIES=(); MIN_SUMMARIES=(); MAX_SUMMARIES=()
+    UNIQUE_VALUES=(); AVG_SUMMARIES=(); AVG_COUNTS=()
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        SUM_SUMMARIES[$i]=0; COUNT_SUMMARIES[$i]=0; MIN_SUMMARIES[$i]=""; MAX_SUMMARIES[$i]=""
+        UNIQUE_VALUES[$i]=""; AVG_SUMMARIES[$i]=0; AVG_COUNTS[$i]=0
+    done
+}
+
+# prepare_data: Read and validate data from JSON file
+prepare_data() {
+    local data_file="$1"; debug_log "Preparing data from file: $data_file"
+    DATA_ROWS=()
+    local data_json=$(jq -c '. // []' "$data_file")
+    local row_count=$(jq '. | length' <<<"$data_json"); debug_log "Data row count: $row_count"
+    [[ $row_count -eq 0 ]] && debug_log "No data rows to load." && return
+    local jq_expr=".[] | ["
+    for key in "${KEYS[@]}"; do jq_expr+=".${key} // null,"; done
+    jq_expr="${jq_expr%,}] | join(\"\t\")"
+    local all_data=$(jq -r "$jq_expr" "$data_file")
+    IFS=$'\n' read -d '' -r -a rows <<< "$all_data"
+    for ((i=0; i<row_count; i++)); do
+        IFS=$'\t' read -r -a values <<< "${rows[$i]}"
+        declare -A row_data
+        for ((j=0; j<${#KEYS[@]}; j++)); do
+            local key="${KEYS[$j]}" value="${values[$j]}"
+            [[ "$value" == "null" ]] && value="null" || value="${value:-null}"
+            row_data["$key"]="$value"
+        done
+        DATA_ROWS[$i]=$(declare -p row_data); debug_log "Loaded row $i into memory"
+    done
+    debug_log "After loading, DATA_ROWS length: ${#DATA_ROWS[@]}"
+}
+
+# sort_data: Apply sorting to data
+sort_data() {
+    debug_log "Sorting data"; debug_log "DATA_ROWS length before processing sort: ${#DATA_ROWS[@]}"
+    [[ ${#SORT_KEYS[@]} -eq 0 ]] && debug_log "No sort keys defined, skipping sort" && return
+    debug_log "Performing in-memory sorting"
+    local indices=(); for ((i=0; i<${#DATA_ROWS[@]}; i++)); do indices+=("$i"); done
+    get_sort_value() {
+        local idx="$1" key="$2"
+        declare -A row_data
+        if ! eval "${DATA_ROWS[$idx]}"; then
+            debug_log "Error evaluating DATA_ROWS[$idx]"
+            echo ""
+            return
+        fi
+        if [[ -v "row_data[$key]" ]]; then
+            echo "${row_data[$key]}"
+        else
+            debug_log "Key $key not found in row_data for sort"
+            echo ""
+        fi
+    }
+    local primary_key="${SORT_KEYS[0]}" primary_dir="${SORT_DIRECTIONS[0]}"
+    debug_log "Sorting by primary key: $primary_key, direction: $primary_dir"
+    local sorted_indices=()
+    IFS=$'\n' read -d '' -r -a sorted_indices < <(for idx in "${indices[@]}"; do
+        value=$(get_sort_value "$idx" "$primary_key"); printf "%s\t%s\n" "$value" "$idx"
+    done | sort -k1,1${primary_dir:0:1} | cut -f2)
+    local temp_rows=("${DATA_ROWS[@]}"); DATA_ROWS=()
+    for idx in "${sorted_indices[@]}"; do
+        DATA_ROWS+=("${temp_rows[$idx]}"); debug_log "Moved row $idx to new position in sorted order"
+    done
+    debug_log "Data sorted successfully in-memory"
+}
+
+# process_data_rows: Process data rows, update widths and calculate summaries
+process_data_rows() {
+    debug_log "DATA_ROWS length before processing: ${#DATA_ROWS[@]}"
+    local row_count; MAX_LINES=1; row_count=${#DATA_ROWS[@]}; debug_log "Processing $row_count rows of data from DATA_ROWS (length: ${#DATA_ROWS[@]})"
+    [[ $row_count -eq 0 ]] && debug_log "WARNING: No data rows loaded. Check data file or input."
+    debug_log "Number of columns: $COLUMN_COUNT"; debug_log "Column headers: ${HEADERS[*]}"
+    debug_log "Column keys: ${KEYS[*]}"; debug_log "Initial widths: ${WIDTHS[*]}"
+    ROW_JSONS=()
+    for ((i=0; i<row_count; i++)); do
+        local row_json line_count=1; row_json="{\"row\":$i}"; ROW_JSONS+=("$row_json")
+        debug_log "Processing row $i from memory"
+        declare -A row_data
+        if ! eval "${DATA_ROWS[$i]}"; then
+            debug_log "Error evaluating DATA_ROWS[$i], skipping row"
+            continue
+        fi
+        for ((j=0; j<COLUMN_COUNT; j++)); do
+            local key="${KEYS[$j]}" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}" string_limit="${STRING_LIMITS[$j]}" wrap_mode="${WRAP_MODES[$j]}" wrap_char="${WRAP_CHARS[$j]}"
+            local validate_fn="${DATATYPE_HANDLERS[${datatype}_validate]}" format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
+            local value="null"
+            if [[ -v "row_data[$key]" ]]; then
+                value="${row_data[$key]}"
+                debug_log "Key $key found in row_data with value: $value"
+            else
+                debug_log "Key $key not found in row_data, defaulting to null"
+            fi
+            value=$("$validate_fn" "$value")
+            local display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
+            debug_log "Column $j (${HEADERS[$j]}): Raw value='$value', Formatted value='$display_value'"
+            if [[ "$value" == "null" ]]; then
+                case "${NULL_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+                debug_log "Null value handling: '$value' -> '$display_value'"
+            elif [[ "$value" == "0" || "$value" == "0m" || "$value" == "0M" || "$value" == "0G" || "$value" == "0K" ]]; then
+                case "${ZERO_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+                debug_log "Zero value handling: '$value' -> '$display_value'"
+            fi
+            if [[ "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
+                if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
+                    local max_len=0 IFS="$wrap_char"; read -ra parts <<<"$display_value"
+                    for part in "${parts[@]}"; do
+                        local len=$(echo -n "$part" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                        [[ $len -gt $max_len ]] && max_len=$len
+                    done
+                    local padded_width=$((max_len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
+                    [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}; debug_log "Wrapped value: parts=${#parts[@]}, max_len=$max_len, new width=${WIDTHS[j]}"
+                else
+                    local len=$(echo -n "$display_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                    local padded_width=$((len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
+                    debug_log "Plain value: len=$len, new width=${WIDTHS[$j]}"
+                fi
+            else debug_log "Enforcing specified width or visibility for column $j (${HEADERS[$j]}): width=${WIDTHS[j]} (from layout or hidden)"; fi
+            update_summaries "$j" "$value" "${DATATYPES[$j]}" "${SUMMARIES[$j]}"
+        done
+        [[ $line_count -gt $MAX_LINES ]] && MAX_LINES=$line_count
+    done
+    for ((j=0; j<COLUMN_COUNT; j++)); do
+        if [[ "${SUMMARIES[$j]}" != "none" ]]; then
+            local summary_value="" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}"
+            case "${SUMMARIES[$j]}" in
+                sum)
+                    if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
+                        if [[ "$datatype" == "kcpu" ]]; then
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$j]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}m"
+                        elif [[ "$datatype" == "kmem" ]]; then
+                            local formatted_num=$(echo "${SUM_SUMMARIES[$j]}" | awk '{ printf "%\047d", $0 }')
+                            summary_value="${formatted_num}M"
+                        elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format")
+                        elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then summary_value="${SUM_SUMMARIES[$j]}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value"); fi
+                    fi;;
+                min) summary_value="${MIN_SUMMARIES[$j]:-}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value");;
+                max) summary_value="${MAX_SUMMARIES[$j]:-}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value");;
+                count) summary_value="${COUNT_SUMMARIES[$j]:-0}";;
+                unique)
+                    if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then
+                        local unique_count=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}'); summary_value="$unique_count"
+                    else summary_value="0"; fi;;
+                avg)
+                    if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
+                        local avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}}")
+                        if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result")
+                        elif [[ "$datatype" == "float" ]]; then
+                            if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then local decimals="${BASH_REMATCH[1]}"; summary_value=$(printf "%.${decimals}f" "$avg_result")
+                            else summary_value=$(printf "%.2f" "$avg_result"); fi
+                        elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "$avg_result" "$format")
+                        else summary_value="$avg_result"; fi
+                    else summary_value="0"; fi;;
+            esac
+            if [[ -n "$summary_value" && "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
+                local summary_len=$(echo -n "$summary_value" | sed 's/\x1B\[[0-9;]*m//g' | wc -c)
+                local summary_padded_width=$((summary_len + (2 * PADDINGS[j])))
+                if [[ $summary_padded_width -gt ${WIDTHS[j]} ]]; then
+                    debug_log "Column $j (${HEADERS[$j]}): Adjusting width for summary value '$summary_value', new width=$summary_padded_width"
+                    WIDTHS[j]=$summary_padded_width
+                fi
+            fi
+        fi
+    done
+    debug_log "Final column widths after summary adjustment: ${WIDTHS[*]}"
+    debug_log "Max lines per row: $MAX_LINES"
+    debug_log "Total rows to render: ${#ROW_JSONS[@]} (DATA_ROWS length: ${#DATA_ROWS[@]})"
+}
+
+# update_summaries: Update summaries for a column
+update_summaries() {
+    local j="$1" value="$2" datatype="$3" summary_type="$4"
+    case "$summary_type" in
+        sum)
+            if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%m} ))
+            elif [[ "$datatype" == "kmem" ]]; then
+                if [[ "$value" =~ ^[0-9]+M$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%M} ))
+                elif [[ "$value" =~ ^[0-9]+G$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%G} * 1000 ))
+                elif [[ "$value" =~ ^[0-9]+K$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%K} / 1000 ))
+                elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Mi} ))
+                elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Gi} * 1000 )); fi
+            elif [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then SUM_SUMMARIES[$j]=$(awk "BEGIN {print (${SUM_SUMMARIES[$j]:-0} + $value)}"); fi
+            fi;;
+        min)
+            if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || awk "BEGIN {if ($value < ${MIN_SUMMARIES[$j]}) exit 0; else exit 1}" 2>/dev/null; then MIN_SUMMARIES[$j]="$value"; fi
+            fi;;
+        max)
+            if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || awk "BEGIN {if ($value > ${MAX_SUMMARIES[$j]}) exit 0; else exit 1}" 2>/dev/null; then MAX_SUMMARIES[$j]="$value"; fi
+            fi;;
+        count) if [[ -n "$value" && "$value" != "null" ]]; then COUNT_SUMMARIES[$j]=$(( ${COUNT_SUMMARIES[$j]:-0} + 1 )); fi;;
+        unique) if [[ -n "$value" && "$value" != "null" ]]; then
+            if [[ -z "${UNIQUE_VALUES[$j]}" ]]; then UNIQUE_VALUES[$j]="$value"; else UNIQUE_VALUES[$j]+=" $value"; fi; fi;;
+        avg)
+            if [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                    AVG_SUMMARIES[$j]=$(awk "BEGIN {print (${AVG_SUMMARIES[$j]:-0} + $value)}"); AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 )); fi
+            fi;;
+    esac
 }
 
 # Debug logger with ms timestamps
