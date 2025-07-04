@@ -19,6 +19,7 @@ When sourced, the following functions are exported and available:
 ### Core Functions
 
 #### `tables_render <layout_file> <data_file> [options]`
+
 Renders a table from JSON files (same as command-line usage).
 
 ```bash
@@ -26,6 +27,7 @@ tables_render layout.json data.json --debug
 ```
 
 #### `tables_render_from_json <layout_json> <data_json> [options]`
+
 Renders a table directly from JSON strings without requiring files.
 
 ```bash
@@ -35,11 +37,13 @@ tables_render_from_json "$layout" "$data"
 ```
 
 #### `draw_table <layout_file> <data_file> [options]`
+
 The core table rendering function (same as `tables_render`).
 
 ### Utility Functions
 
 #### `tables_get_themes`
+
 Returns available themes.
 
 ```bash
@@ -48,6 +52,7 @@ echo "$(tables_get_themes)"
 ```
 
 #### `tables_version`
+
 Returns the library version.
 
 ```bash
@@ -56,6 +61,7 @@ echo "Version: $(tables_version)"
 ```
 
 #### `tables_reset`
+
 Resets all global state variables. Useful when generating multiple tables to ensure clean state.
 
 ```bash
@@ -63,6 +69,7 @@ tables_reset
 ```
 
 #### `get_theme <theme_name>`
+
 Sets the current theme (Red, Blue).
 
 ```bash
@@ -70,6 +77,7 @@ get_theme "Blue"
 ```
 
 #### `format_with_commas <number>`
+
 Formats numbers with comma separators.
 
 ```bash
@@ -78,6 +86,7 @@ echo "$formatted"  # Output: 1,234,567
 ```
 
 #### `get_display_length <text>`
+
 Gets the display length of text (excluding ANSI escape sequences).
 
 ```bash
@@ -88,11 +97,13 @@ echo "$length"  # Output: 11
 ## Benefits of Sourcing
 
 ### Performance
+
 - **No process overhead**: Functions run in the current shell
 - **Faster execution**: No script startup time for multiple tables
 - **Memory efficiency**: Shared state and functions
 
 ### Integration
+
 - **Direct JSON handling**: Pass JSON strings without temporary files
 - **State management**: Control global state between table generations
 - **Utility access**: Use formatting and helper functions directly
@@ -241,6 +252,7 @@ See `example_sourced.sh` for a comprehensive demonstration of all sourced functi
 ## Performance Comparison
 
 **Command-line approach** (separate processes):
+
 ```bash
 for i in {1..10}; do
     ./tables.sh layout.json data.json
@@ -248,6 +260,7 @@ done
 ```
 
 **Sourced approach** (single process):
+
 ```bash
 source tables.sh
 for i in {1..10}; do
