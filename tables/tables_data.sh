@@ -48,6 +48,10 @@ prepare_data() {
     local data_file="$1"
     debug_log "Preparing data from file: $data_file"
     
+    # Clear previous data
+    DATA_ROWS=()
+    
+    # Use a single jq call to extract all data into a structured format
     local data_json
     data_json=$(jq -c '. // []' "$data_file")
     
@@ -55,17 +59,31 @@ prepare_data() {
     row_count=$(jq '. | length' <<<"$data_json")
     debug_log "Data row count: $row_count"
     
-    # Clear previous data
-    DATA_ROWS=()
+    if [[ $row_count -eq 0 ]]; then
+        debug_log "No data rows to load."
+        return
+    fi
     
-    # Load all data into Bash arrays
+    # Build a jq expression to extract values in the order of KEYS
+    local jq_expr=".[] | ["
+    for key in "${KEYS[@]}"; do
+        jq_expr+=".${key} // null,"
+    done
+    jq_expr="${jq_expr%,}] | join(\"\t\")"
+    
+    # Extract all rows and columns in one jq call, using a delimited format for easy parsing
+    local all_data
+    all_data=$(jq -r "$jq_expr" "$data_file")
+    
+    # Read the data into Bash arrays
+    IFS=$'\n' read -d '' -r -a rows <<< "$all_data"
     for ((i=0; i<row_count; i++)); do
-        local row_json
-        row_json=$(jq -c ".[$i]" <<<"$data_json")
+        IFS=$'\t' read -r -a values <<< "${rows[$i]}"
         declare -A row_data
-        for key in "${KEYS[@]}"; do
-            local value
-            value=$(jq -r ".${key} // null" <<<"$row_json")
+        for ((j=0; j<${#KEYS[@]}; j++)); do
+            local key="${KEYS[$j]}"
+            local value="${values[$j]}"
+            [[ "$value" == "null" ]] && value="null" || value="${value:-null}"
             row_data["$key"]="$value"
         done
         DATA_ROWS[$i]=$(declare -p row_data)
