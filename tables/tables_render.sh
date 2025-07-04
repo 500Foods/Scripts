@@ -1,6 +1,3 @@
-#!/usr/bin/env bash
-# tables_render.sh: Rendering system for tables.sh
-
 # get_display_length: Get display length of text, ignoring ANSI escape sequences
 get_display_length() {
     local text="$1"
