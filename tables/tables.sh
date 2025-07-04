@@ -39,10 +39,11 @@ declare -g DEFAULT_PADDING=1
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source all library modules
-source "$SCRIPT_DIR/lib/tables_themes.sh"
-source "$SCRIPT_DIR/lib/tables_datatypes.sh"
-source "$SCRIPT_DIR/lib/tables_config.sh"
-source "$SCRIPT_DIR/lib/tables_data.sh"
+source "$SCRIPT_DIR/tables_themes.sh"
+source "$SCRIPT_DIR/tables_datatypes.sh"
+source "$SCRIPT_DIR/tables_config.sh"
+source "$SCRIPT_DIR/tables_data.sh"
+source "$SCRIPT_DIR/tables_render.sh"
 
 # Debug logger function
 debug_log() {
@@ -150,9 +151,6 @@ calculate_table_width() {
     fi
     echo "$width"
 }
-
-# Source the rendering module (this is large, so we'll create it separately)
-source "$SCRIPT_DIR/lib/tables_render.sh"
 
 # draw_table: Main function to render an ANSI table from JSON layout and data files
 # Args: layout_json_file (path to layout JSON), data_json_file (path to data JSON),
