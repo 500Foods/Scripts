@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source remaining library modules
 # source "$SCRIPT_DIR/tables_datatypes.sh" # Integrated
-source "$SCRIPT_DIR/tables_config.sh"
+# source "$SCRIPT_DIR/tables_config.sh" # Integrated
 source "$SCRIPT_DIR/tables_data.sh"
 source "$SCRIPT_DIR/tables_render.sh"
 
@@ -157,6 +157,118 @@ format_display_value() {
         case "$zero_value" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
     fi
     echo "$display_value"
+}
+
+# CONFIG SECTION (from tables_config.sh)
+# Global variables for title/footer
+declare -gx TABLE_TITLE="" TITLE_WIDTH=0 TITLE_POSITION="none"
+declare -gx TABLE_FOOTER="" FOOTER_WIDTH=0 FOOTER_POSITION="none"
+
+# Global arrays for table config
+declare -ax HEADERS=() KEYS=() JUSTIFICATIONS=() DATATYPES=() NULL_VALUES=() ZERO_VALUES=()
+declare -ax FORMATS=() SUMMARIES=() BREAKS=() STRING_LIMITS=() WRAP_MODES=() WRAP_CHARS=()
+declare -ax PADDINGS=() WIDTHS=() SORT_KEYS=() SORT_DIRECTIONS=() SORT_PRIORITIES=()
+declare -ax IS_WIDTH_SPECIFIED=() VISIBLES=()
+
+# validate_input_files: Check if files exist
+validate_input_files() {
+    local layout_file="$1" data_file="$2"; debug_log "Validating input files"
+    [[ ! -s "$layout_file" || ! -s "$data_file" ]] && echo -e "${THEME[border_color]}Error: Layout or data JSON file empty/missing${THEME[text_color]}" >&2 && return 1
+    return 0
+}
+
+# parse_layout_file: Extract theme/columns/sort from JSON
+parse_layout_file() {
+    local layout_file="$1"; debug_log "Parsing layout file"
+    local columns_json sort_json
+    THEME_NAME=$(jq -r '.theme // "Red"' "$layout_file")
+    TABLE_TITLE=$(jq -r '.title // ""' "$layout_file")
+    TITLE_POSITION=$(jq -r '.title_position // "none"' "$layout_file" | tr '[:upper:]' '[:lower:]')
+    TABLE_FOOTER=$(jq -r '.footer // ""' "$layout_file")
+    FOOTER_POSITION=$(jq -r '.footer_position // "none"' "$layout_file" | tr '[:upper:]' '[:lower:]')
+    columns_json=$(jq -c '.columns // []' "$layout_file")
+    sort_json=$(jq -c '.sort // []' "$layout_file")
+    case "$TITLE_POSITION" in left|right|center|full|none) ;; *) echo -e "${THEME[border_color]}Warning: Invalid title position '$TITLE_POSITION', using 'none'${THEME[text_color]}" >&2; TITLE_POSITION="none";; esac
+    case "$FOOTER_POSITION" in left|right|center|full|none) ;; *) echo -e "${THEME[border_color]}Warning: Invalid footer position '$FOOTER_POSITION', using 'none'${THEME[text_color]}" >&2; FOOTER_POSITION="none";; esac
+    [[ -z "$columns_json" || "$columns_json" == "[]" ]] && echo -e "${THEME[border_color]}Error: No columns defined in layout JSON${THEME[text_color]}" >&2 && return 1
+    parse_column_config "$columns_json"; parse_sort_config "$sort_json"
+}
+
+# parse_column_config: Process column configs
+parse_column_config() {
+    local columns_json="$1"; debug_log "Parsing column config"
+    HEADERS=(); KEYS=(); JUSTIFICATIONS=(); DATATYPES=(); NULL_VALUES=(); ZERO_VALUES=()
+    FORMATS=(); SUMMARIES=(); BREAKS=(); STRING_LIMITS=(); WRAP_MODES=(); WRAP_CHARS=()
+    PADDINGS=(); WIDTHS=(); IS_WIDTH_SPECIFIED=(); VISIBLES=()
+    local column_count=$(jq '. | length' <<<"$columns_json"); COLUMN_COUNT=$column_count
+    for ((i=0; i<column_count; i++)); do
+        local col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        HEADERS[i]=$(jq -r '.header // ""' <<<"$col_json")
+        KEYS[i]=$(jq -r '.key // (.header | ascii_downcase | gsub("[^a-z0-9]"; "_"))' <<<"$col_json")
+        JUSTIFICATIONS[i]=$(jq -r '.justification // "left"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        DATATYPES[i]=$(jq -r '.datatype // "text"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        NULL_VALUES[i]=$(jq -r '.null_value // "blank"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        ZERO_VALUES[i]=$(jq -r '.zero_value // "blank"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        FORMATS[i]=$(jq -r '.format // ""' <<<"$col_json")
+        SUMMARIES[i]=$(jq -r '.summary // "none"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        BREAKS[i]=$(jq -r '.break // false' <<<"$col_json")
+        STRING_LIMITS[i]=$(jq -r '.string_limit // 0' <<<"$col_json")
+        WRAP_MODES[i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
+        WRAP_CHARS[i]=$(jq -r '.wrap_char // ""' <<<"$col_json")
+        PADDINGS[i]=$(jq -r '.padding // '"$DEFAULT_PADDING" <<<"$col_json")
+        local visible_raw=$(jq -r '.visible // true' <<<"$col_json")
+        local visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
+        if [[ "$visible_key_check" == "true" ]]; then
+            local visible_value=$(jq -r '.visible' <<<"$col_json")
+            VISIBLES[i]="$visible_value"
+        else
+            VISIBLES[i]="$visible_raw"
+        fi
+        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
+    done
+    for ((i=0; i<COLUMN_COUNT; i++)); do
+        local col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        local specified_width=$(jq -r '.width // 0' <<<"$col_json")
+        if [[ $specified_width -gt 0 ]]; then
+            WIDTHS[i]=$specified_width
+            IS_WIDTH_SPECIFIED[i]="true"
+            debug_log "Width specified for column $i (${HEADERS[$i]}): ${WIDTHS[$i]}"
+        else
+            WIDTHS[i]=$((${#HEADERS[i]} + (2 * PADDINGS[i])))
+            IS_WIDTH_SPECIFIED[i]="false"
+            debug_log "Width not specified for column $i (${HEADERS[$i]}), using header length: ${WIDTHS[$i]}"
+        fi
+        debug_log "Initial width for column $i (${HEADERS[$i]}): ${WIDTHS[$i]} (including padding ${PADDINGS[$i]}), Width specified: ${IS_WIDTH_SPECIFIED[$i]}"
+    done
+    debug_log "After parse_column_config - Number of columns: $COLUMN_COUNT"
+    debug_log "After parse_column_config - Headers: ${HEADERS[*]}"
+    debug_log "After parse_column_config - Keys: ${KEYS[*]}"
+    debug_log "After parse_column_config - Visibles: ${VISIBLES[*]}"
+}
+
+# validate_column_config: Validate column config
+validate_column_config() {
+    local i="$1" header="$2" justification="$3" datatype="$4" summary="$5"
+    [[ -z "$header" ]] && echo -e "${THEME[border_color]}Error: Column $i has no header${THEME[text_color]}" >&2 && return 1
+    [[ "$justification" != "left" && "$justification" != "right" && "$justification" != "center" ]] && echo -e "${THEME[border_color]}Warning: Invalid justification '$justification' for column $header, using 'left'${THEME[text_color]}" >&2 && JUSTIFICATIONS[i]="left"
+    [[ -z "${DATATYPE_HANDLERS[${datatype}_validate]}" ]] && echo -e "${THEME[border_color]}Warning: Invalid datatype '$datatype' for column $header, using 'text'${THEME[text_color]}" >&2 && DATATYPES[i]="text"
+    local valid_summaries="${DATATYPE_HANDLERS[${DATATYPES[$i]}_summary_types]}"
+    [[ "$summary" != "none" && ! " $valid_summaries " =~ $summary ]] && echo -e "${THEME[border_color]}Warning: Summary '$summary' not supported for datatype '${DATATYPES[$i]}' in column $header, using 'none'${THEME[text_color]}" >&2 && SUMMARIES[i]="none"
+}
+
+# parse_sort_config: Process sort configs
+parse_sort_config() {
+    local sort_json="$1"; debug_log "Parsing sort config"
+    SORT_KEYS=(); SORT_DIRECTIONS=(); SORT_PRIORITIES=()
+    local sort_count=$(jq '. | length' <<<"$sort_json")
+    for ((i=0; i<sort_count; i++)); do
+        local sort_item=$(jq -c ".[$i]" <<<"$sort_json")
+        SORT_KEYS[i]=$(jq -r '.key // ""' <<<"$sort_item")
+        SORT_DIRECTIONS[i]=$(jq -r '.direction // "asc"' <<<"$sort_item" | tr '[:upper:]' '[:lower:]')
+        SORT_PRIORITIES[i]=$(jq -r '.priority // 0' <<<"$sort_item")
+        [[ -z "${SORT_KEYS[$i]}" ]] && echo -e "${THEME[border_color]}Warning: Sort item $i has no key, ignoring${THEME[text_color]}" >&2 && continue
+        [[ "${SORT_DIRECTIONS[$i]}" != "asc" && "${SORT_DIRECTIONS[$i]}" != "desc" ]] && echo -e "${THEME[border_color]}Warning: Invalid sort direction '${SORT_DIRECTIONS[$i]}' for key ${SORT_KEYS[$i]}, using 'asc'${THEME[text_color]}" >&2 && SORT_DIRECTIONS[i]="asc"
+    done
 }
 
 # Debug logger with ms timestamps
