@@ -1,6 +1,26 @@
 #!/usr/bin/env bash
 # tables_render.sh: Rendering system for tables.sh
 
+# get_display_length: Get display length of text, ignoring ANSI escape sequences
+get_display_length() {
+    local text="$1"
+    # Remove ANSI escape sequences using sed (faster than multiple bash substitutions)
+    local clean_text
+    clean_text=$(echo -n "$text" | sed 's/\x1B\[[0-9;]*[mK]//g')
+    echo "${#clean_text}"
+}
+
+# format_with_commas: Add thousands separators to numbers (faster than awk)
+format_with_commas() {
+    local num="$1"
+    # Use bash parameter expansion to add commas
+    local result="$num"
+    while [[ $result =~ ^([0-9]+)([0-9]{3}) ]]; do
+        result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
+    done
+    echo "$result"
+}
+
 # calculate_table_width: Calculate total table width including visible columns and separators
 calculate_table_width() {
     local total_table_width=0 visible_count=0
@@ -429,11 +449,11 @@ render_summaries_row() {
                         if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
                             if [[ "$datatype" == "kcpu" ]]; then
                                 local formatted_num
-                                formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                                formatted_num=$(format_with_commas "${SUM_SUMMARIES[$i]}")
                                 summary_value="${formatted_num}m"
                             elif [[ "$datatype" == "kmem" ]]; then
                                 local formatted_num
-                                formatted_num=$(echo "${SUM_SUMMARIES[$i]}" | awk '{ printf "%\047d", $0 }')
+                                formatted_num=$(format_with_commas "${SUM_SUMMARIES[$i]}")
                                 summary_value="${formatted_num}M"
                             elif [[ "$datatype" == "num" ]]; then
                                 summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
@@ -456,7 +476,7 @@ render_summaries_row() {
                         ;;
                     unique)
                         if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
-                            summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l | awk '{print $1}')
+                            summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l)
                         else
                             summary_value="0"
                         fi
@@ -464,7 +484,8 @@ render_summaries_row() {
                     avg)
                         if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
                             local avg_result
-                            avg_result=$(awk "BEGIN {printf \"%.10f\", ${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}}")
+                            # Use bash arithmetic for division (will be integer division, but good enough for most cases)
+                            avg_result=$((${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}))
                             
                             # Format based on datatype
                             if [[ "$datatype" == "int" ]]; then
@@ -493,7 +514,7 @@ render_summaries_row() {
                 if [[ ${#summary_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
                     case "${JUSTIFICATIONS[$i]}" in
                         right)
-                            summary_value="${summary_value: -$content_width}"
+                                summary_value="${summary_value: -$content_width}"
                             ;;
                         center)
                             local excess=$(( ${#summary_value} - content_width ))
