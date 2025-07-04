@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # tables.sh - Library for JSON to ANSI tables
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEBUG_FLAG=false
 declare -r TABLES_VERSION="1.0.2"
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
@@ -11,9 +10,13 @@ declare -A BLUE_THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' 
 declare -A THEME
 for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done
 
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_number() { local value="$1"; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo ""; fi; }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_kcpu() { local value="$1"; if [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then echo "$value"; else echo "$value"; fi; }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_kmem() { local value="$1"; if [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo "$value"; fi; }
 
 get_theme() {
@@ -41,6 +44,7 @@ format_with_commas() {
     done
     echo "$result"
 }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_text() {
     local value="$1" format="$2" string_limit="$3" wrap_mode="$4" wrap_char="$5" justification="$6"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -59,8 +63,26 @@ format_text() {
         fi
     else echo "$value"; fi
 }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_number() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; [[ -n "$format" && "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && printf '%s' "$value" || echo "$value"; }
-format_num() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then [[ -n "$format" ]] && printf '%s' "$value" || format_with_commas "$value"; else echo "$value"; fi; }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
+format_num() {
+    local value="$1" format="$2"
+    if [[ -z "$value" || "$value" == "null" || "$value" == "0" ]]; then
+        echo ""
+        return
+    fi
+    if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        if [[ -n "$format" ]]; then
+            printf '%s' "$value"
+        else
+            format_with_commas "$value"
+        fi
+    else
+        echo "$value"
+    fi
+}
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_kcpu() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -68,7 +90,8 @@ format_kcpu() {
     
     if [[ "$value" =~ ^[0-9]+m$ ]]; then
         local num_part="${value%m}"
-        local formatted_num=$(format_with_commas "$num_part")
+        local formatted_num
+        formatted_num=$(format_with_commas "$num_part")
         echo "${formatted_num}m"
     elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
         local int_value=${value%.*}
@@ -79,6 +102,7 @@ format_kcpu() {
         echo "$value"
     fi
 }
+# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_kmem() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -87,19 +111,23 @@ format_kmem() {
     if [[ "$value" =~ ^[0-9]+[KMG]$ ]]; then
         local num_part="${value%[KMG]}"
         local unit="${value: -1}"
-        local formatted_num=$(format_with_commas "$num_part")
+        local formatted_num
+        formatted_num=$(format_with_commas "$num_part")
         echo "${formatted_num}${unit}"
     elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then
         local num_part="${value%Mi}"
-        local formatted_num=$(format_with_commas "$num_part")
+        local formatted_num
+        formatted_num=$(format_with_commas "$num_part")
         echo "${formatted_num}M"
     elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then
         local num_part="${value%Gi}"
-        local formatted_num=$(format_with_commas "$num_part")
+        local formatted_num
+        formatted_num=$(format_with_commas "$num_part")
         echo "${formatted_num}G"
     elif [[ "$value" =~ ^[0-9]+Ki$ ]]; then
         local num_part="${value%Ki}"
-        local formatted_num=$(format_with_commas "$num_part")
+        local formatted_num
+        formatted_num=$(format_with_commas "$num_part")
         echo "${formatted_num}K"
     else
         echo "$value"
@@ -159,9 +187,12 @@ parse_column_config() {
     HEADERS=(); KEYS=(); JUSTIFICATIONS=(); DATATYPES=(); NULL_VALUES=(); ZERO_VALUES=()
     FORMATS=(); SUMMARIES=(); BREAKS=(); STRING_LIMITS=(); WRAP_MODES=(); WRAP_CHARS=()
     PADDINGS=(); WIDTHS=(); IS_WIDTH_SPECIFIED=(); VISIBLES=()
-    local column_count=$(jq '. | length' <<<"$columns_json"); COLUMN_COUNT=$column_count
+    local column_count
+    column_count=$(jq '. | length' <<<"$columns_json")
+    COLUMN_COUNT=$column_count
     for ((i=0; i<column_count; i++)); do
-        local col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        local col_json
+        col_json=$(jq -c ".[$i]" <<<"$columns_json")
         HEADERS[i]=$(jq -r '.header // ""' <<<"$col_json")
         KEYS[i]=$(jq -r '.key // (.header | ascii_downcase | gsub("[^a-z0-9]"; "_"))' <<<"$col_json")
         JUSTIFICATIONS[i]=$(jq -r '.justification // "left"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
@@ -175,10 +206,13 @@ parse_column_config() {
         WRAP_MODES[i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         WRAP_CHARS[i]=$(jq -r '.wrap_char // ""' <<<"$col_json")
         PADDINGS[i]=$(jq -r '.padding // '"$DEFAULT_PADDING" <<<"$col_json")
-        local visible_raw=$(jq -r '.visible // true' <<<"$col_json")
-        local visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
+        local visible_raw
+        visible_raw=$(jq -r '.visible // true' <<<"$col_json")
+        local visible_key_check
+        visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
         if [[ "$visible_key_check" == "true" ]]; then
-            local visible_value=$(jq -r '.visible' <<<"$col_json")
+            local visible_value
+            visible_value=$(jq -r '.visible' <<<"$col_json")
             VISIBLES[i]="$visible_value"
         else
             VISIBLES[i]="$visible_raw"
@@ -186,8 +220,10 @@ parse_column_config() {
         validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
     done
     for ((i=0; i<COLUMN_COUNT; i++)); do
-        local col_json=$(jq -c ".[$i]" <<<"$columns_json")
-        local specified_width=$(jq -r '.width // 0' <<<"$col_json")
+        local col_json
+        col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        local specified_width
+        specified_width=$(jq -r '.width // 0' <<<"$col_json")
         if [[ $specified_width -gt 0 ]]; then
             WIDTHS[i]=$specified_width; IS_WIDTH_SPECIFIED[i]="true"
         else
@@ -206,9 +242,11 @@ validate_column_config() {
 parse_sort_config() {
     local sort_json="$1"
     SORT_KEYS=(); SORT_DIRECTIONS=(); SORT_PRIORITIES=()
-    local sort_count=$(jq '. | length' <<<"$sort_json")
+    local sort_count
+    sort_count=$(jq '. | length' <<<"$sort_json")
     for ((i=0; i<sort_count; i++)); do
-        local sort_item=$(jq -c ".[$i]" <<<"$sort_json")
+        local sort_item
+        sort_item=$(jq -c ".[$i]" <<<"$sort_json")
         SORT_KEYS[i]=$(jq -r '.key // ""' <<<"$sort_item")
         SORT_DIRECTIONS[i]=$(jq -r '.direction // "asc"' <<<"$sort_item" | tr '[:upper:]' '[:lower:]')
         SORT_PRIORITIES[i]=$(jq -r '.priority // 0' <<<"$sort_item")
@@ -232,13 +270,16 @@ initialize_summaries() {
 prepare_data() {
     local data_file="$1"
     DATA_ROWS=()
-    local data_json=$(jq -c '. // []' "$data_file")
-    local row_count=$(jq '. | length' <<<"$data_json")
+    local data_json
+    data_json=$(jq -c '. // []' "$data_file")
+    local row_count
+    row_count=$(jq '. | length' <<<"$data_json")
     [[ $row_count -eq 0 ]] && return
-    local jq_expr=".[] | ["
-    for key in "${KEYS[@]}"; do jq_expr+=".${key} // null,"; done
-    jq_expr="${jq_expr%,}] | join(\"\t\")"
-    local all_data=$(jq -r "$jq_expr" "$data_file")
+        local jq_expr=".[] | ["
+        for key in "${KEYS[@]}"; do jq_expr+=".${key} // null,"; done
+        jq_expr="${jq_expr%,}] | join(\"\t\")"
+        local all_data
+        all_data=$(jq -r "$jq_expr" "$data_file")
     IFS=$'\n' read -d '' -r -a rows <<< "$all_data"
     for ((i=0; i<row_count; i++)); do
         IFS=$'\t' read -r -a values <<< "${rows[$i]}"
@@ -248,7 +289,9 @@ prepare_data() {
             [[ "$value" == "null" ]] && value="null" || value="${value:-null}"
             row_data["$key"]="$value"
         done
-        DATA_ROWS[$i]=$(declare -p row_data)
+        local row_data_str
+        row_data_str=$(declare -p row_data)
+        DATA_ROWS[i]="$row_data_str"
     done
 }
 sort_data() {
@@ -264,7 +307,7 @@ sort_data() {
     local sorted_indices=()
     IFS=$'\n' read -d '' -r -a sorted_indices < <(for idx in "${indices[@]}"; do
         value=$(get_sort_value "$idx" "$primary_key"); printf "%s\t%s\n" "$value" "$idx"
-    done | sort -k1,1${primary_dir:0:1} | cut -f2)
+    done | sort -k1,1"${primary_dir:0:1}" | cut -f2)
     local temp_rows=("${DATA_ROWS[@]}"); DATA_ROWS=()
     for idx in "${sorted_indices[@]}"; do DATA_ROWS+=("${temp_rows[$idx]}"); done
 }
@@ -273,7 +316,8 @@ process_data_rows() {
     [[ $row_count -eq 0 ]] && return
     ROW_JSONS=()
     for ((i=0; i<row_count; i++)); do
-        local row_json line_count=1; row_json="{\"row\":$i}"; ROW_JSONS+=("$row_json")
+        local row_json line_count=1
+        row_json="{\"row\":$i}"; ROW_JSONS+=("$row_json")
         declare -A row_data
         if ! eval "${DATA_ROWS[$i]}"; then continue; fi
         for ((j=0; j<COLUMN_COUNT; j++)); do
@@ -282,7 +326,8 @@ process_data_rows() {
             local value="null"
             if [[ -v "row_data[$key]" ]]; then value="${row_data[$key]}"; fi
             value=$("$validate_fn" "$value")
-            local display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
+            local display_value
+            display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
             if [[ "$value" == "null" ]]; then
                 case "${NULL_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
             elif [[ "$value" == "0" || "$value" == "0m" || "$value" == "0M" || "$value" == "0G" || "$value" == "0K" ]]; then
@@ -292,13 +337,15 @@ process_data_rows() {
                 if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
                     local max_len=0 IFS="$wrap_char"; read -ra parts <<<"$display_value"
                     for part in "${parts[@]}"; do
-                        local len=$(get_display_length "$part")
+                        local len
+                        len=$(get_display_length "$part")
                         [[ $len -gt $max_len ]] && max_len=$len
                     done
                     local padded_width=$((max_len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
                     [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
                 else
-                    local len=$(get_display_length "$display_value")
+                    local len
+                    len=$(get_display_length "$display_value")
                     local padded_width=$((len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
                 fi
             fi
@@ -313,10 +360,12 @@ process_data_rows() {
                 sum)
                     if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
                         if [[ "$datatype" == "kcpu" ]]; then
-                            local formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
+                            local formatted_num
+                            formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
                             summary_value="${formatted_num}m"
                         elif [[ "$datatype" == "kmem" ]]; then
-                            local formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
+                            local formatted_num
+                            formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
                             summary_value="${formatted_num}M"
                         elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format")
                         elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then summary_value="${SUM_SUMMARIES[$j]}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value"); fi
@@ -326,11 +375,14 @@ process_data_rows() {
                 count) summary_value="${COUNT_SUMMARIES[$j]:-0}";;
                 unique)
                     if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then
-                        local unique_count=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l); summary_value="$unique_count"
+                        local unique_count
+                        unique_count=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l)
+                        summary_value="$unique_count"
                     else summary_value="0"; fi;;
                 avg)
                     if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
-                        local avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))
+                        local avg_result
+                        avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))
                         if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result")
                         elif [[ "$datatype" == "float" ]]; then
                             if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then local decimals="${BASH_REMATCH[1]}"; summary_value=$(printf "%.${decimals}f" "$avg_result")
@@ -340,7 +392,8 @@ process_data_rows() {
                     else summary_value="0"; fi;;
             esac
             if [[ -n "$summary_value" && "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
-                local summary_len=$(get_display_length "$summary_value")
+                local summary_len
+                summary_len=$(get_display_length "$summary_value")
                 local summary_padded_width=$((summary_len + (2 * PADDINGS[j])))
                 [[ $summary_padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$summary_padded_width
             fi
@@ -389,7 +442,8 @@ EOF
 calculate_title_width() {
     local title="$1" total_table_width="$2"
     if [[ -n "$title" ]]; then
-        local evaluated_title=$(eval "echo \"$title\"")
+        local evaluated_title
+        evaluated_title=$(eval "echo \"$title\"")
         if [[ "$TITLE_POSITION" == "none" ]]; then TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING)))
         elif [[ "$TITLE_POSITION" == "full" ]]; then TITLE_WIDTH=$total_table_width
         else TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING))); [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width; fi
@@ -398,30 +452,12 @@ calculate_title_width() {
 calculate_footer_width() {
     local footer="$1" total_table_width="$2"
     if [[ -n "$footer" ]]; then
-        local evaluated_footer=$(eval "echo \"$footer\"")
+        local evaluated_footer
+        evaluated_footer=$(eval "echo \"$footer\"")
         if [[ "$FOOTER_POSITION" == "none" ]]; then FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING)))
         elif [[ "$FOOTER_POSITION" == "full" ]]; then FOOTER_WIDTH=$total_table_width
         else FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING))); [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width; fi
     else FOOTER_WIDTH=0; fi
-}
-calculate_table_width() {
-    local width=0 visible_count=0
-    for ((i=0; i<COLUMN_COUNT; i++)); do [[ "${VISIBLES[i]}" == "true" ]] && ((width += WIDTHS[i])) && ((visible_count++)); done
-    [[ $visible_count -gt 1 ]] && ((width += visible_count - 1)); echo "$width"
-}
-get_display_length() {
-    local text="$1"
-    local clean_text
-    clean_text=$(echo -n "$text" | sed 's/\x1B\[[0-9;]*[mK]//g')
-    echo "${#clean_text}"
-}
-format_with_commas() {
-    local num="$1"
-    local result="$num"
-    while [[ $result =~ ^([0-9]+)([0-9]{3}) ]]; do
-        result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
-    done
-    echo "$result"
 }
 calculate_table_width() {
     local total_table_width=0 visible_count=0
@@ -546,7 +582,11 @@ render_table_border() {
             char_to_print="$left_char"
         elif [[ $i -eq $((max_width - 1)) ]]; then
             if [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -gt $total_table_width ]]; then
-                char_to_print="${THEME[$([[ "$border_type" == "top" ]] && echo "br_corner" || echo "tr_corner")]}"
+                if [[ "$border_type" == "top" ]]; then
+                    char_to_print="${THEME[br_corner]}"
+                else
+                    char_to_print="${THEME[tr_corner]}"
+                fi
             elif [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -eq $total_table_width ]]; then
                 char_to_print="${THEME[r_junct]}"
             else
@@ -561,11 +601,23 @@ render_table_border() {
             done
             if [[ -n "$element_width" && $element_width -gt 0 ]]; then
                 if [[ $i -eq $element_offset && $element_offset -gt 0 && $element_offset -lt $((total_table_width + 1)) ]]; then
-                    char_to_print="${THEME[$([[ "$border_type" == "top" ]] && echo "b_junct" || echo "t_junct")]}"
+                    if [[ "$border_type" == "top" ]]; then
+                        char_to_print="${THEME[b_junct]}"
+                    else
+                        char_to_print="${THEME[t_junct]}"
+                    fi
                 elif [[ $i -eq $((element_right_edge + 1)) && $((element_right_edge + 1)) -lt $((total_table_width + 1)) ]]; then
-                    char_to_print="${THEME[$([[ "$border_type" == "top" ]] && echo "b_junct" || echo "t_junct")]}"
+                    if [[ "$border_type" == "top" ]]; then
+                        char_to_print="${THEME[b_junct]}"
+                    else
+                        char_to_print="${THEME[t_junct]}"
+                    fi
                 elif [[ $i -eq $((total_table_width + 1)) && $i -lt $((max_width - 1)) && $element_right_edge -gt $((total_table_width - 1)) ]]; then
-                    char_to_print="${THEME[$([[ "$border_type" == "top" ]] && echo "t_junct" || echo "b_junct")]}"
+                    if [[ "$border_type" == "top" ]]; then
+                        char_to_print="${THEME[t_junct]}"
+                    else
+                        char_to_print="${THEME[b_junct]}"
+                    fi
                 fi
             fi
         fi
@@ -640,7 +692,6 @@ render_table_separator() {
     printf "%s${THEME[text_color]}\n" "${right_char}"
 }
 render_data_rows() {
-    local max_lines="$1"
     [[ ${#DATA_ROWS[@]} -eq 0 ]] && return
     local last_break_values=()
     for ((j=0; j<COLUMN_COUNT; j++)); do last_break_values[j]=""; done
@@ -900,7 +951,8 @@ draw_table() {
     prepare_data "$data_file"
     sort_data
     process_data_rows
-    local total_table_width=$(calculate_table_width)
+    local total_table_width
+    total_table_width=$(calculate_table_width)
     [[ -n "$TABLE_TITLE" ]] && render_table_title "$total_table_width"
     render_table_top_border
     render_table_headers
