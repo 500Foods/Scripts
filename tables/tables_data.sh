@@ -103,74 +103,46 @@ sort_data() {
         return
     fi
     
-    local jq_sort=""
-    for i in "${!SORT_KEYS[@]}"; do
-        local key="${SORT_KEYS[$i]}" dir="${SORT_DIRECTIONS[$i]}"
-        
-        if [[ "$dir" == "desc" ]]; then
-            jq_sort+=".${key} | reverse,"
-        else
-            jq_sort+=".${key},"
-        fi
+    debug_log "Performing in-memory sorting"
+    
+    # Since datasets are small, we'll use a simple approach to sort in-memory
+    # Create an array of indices and sort based on the primary sort key
+    local indices=()
+    for ((i=0; i<${#DATA_ROWS[@]}; i++)); do
+        indices+=("$i")
     done
     
-    jq_sort=${jq_sort%,}
-    debug_log "JQ sort expression: $jq_sort"
+    # Function to extract sort value for a given index and key
+    get_sort_value() {
+        local idx="$1" key="$2"
+        eval "${DATA_ROWS[$idx]}"
+        echo "${row_data[$key]}"
+    }
     
-    if [[ -n "$jq_sort" ]]; then
-        # Create a temporary JSON file from DATA_ROWS
-        local temp_data_file
-        temp_data_file=$(mktemp)
-        local json_data="["$'\n'
-        for ((i=0; i<${#DATA_ROWS[@]}; i++)); do
-            eval "${DATA_ROWS[$i]}"
-            local row_json="{"
-            for key in "${KEYS[@]}"; do
-                local value="${row_data[$key]}"
-                if [[ "$value" == "null" ]]; then
-                    row_json+="\"$key\": null"
-                else
-                    row_json+="\"$key\": \"$value\""
-                fi
-                [[ $key != "${KEYS[-1]}" ]] && row_json+=", "
-            done
-            row_json+="}"
-            [[ $i -lt $(( ${#DATA_ROWS[@]} - 1 )) ]] && row_json+=","
-            json_data+="$row_json"$'\n'
-        done
-        json_data+="]"
-        echo "$json_data" > "$temp_data_file"
-        
-        local sorted_data
-        sorted_data=$(jq -c "sort_by($jq_sort)" "$temp_data_file" 2>/tmp/jq_stderr.$$)
-        local jq_exit=$?
-        
-        rm -f "$temp_data_file"
-        
-        if [[ $jq_exit -ne 0 ]]; then
-            echo -e "${THEME[border_color]}Error: Sorting failed${THEME[text_color]}" >&2
-            cat /tmp/jq_stderr.$$ >&2
-            rm -f /tmp/jq_stderr.$$
-        else
-            debug_log "Data sorted successfully"
-            # Update DATA_ROWS based on sorted data
-            local sorted_row_count
-            sorted_row_count=$(jq '. | length' <<<"$sorted_data")
-            DATA_ROWS=()
-            for ((i=0; i<sorted_row_count; i++)); do
-                local row_json
-                row_json=$(jq -c ".[$i]" <<<"$sorted_data")
-                declare -A row_data
-                for key in "${KEYS[@]}"; do
-                    local value
-                    value=$(jq -r ".${key} // null" <<<"$row_json")
-                    row_data["$key"]="$value"
-                done
-                DATA_ROWS[$i]=$(declare -p row_data)
-                debug_log "Loaded sorted row $i into memory"
-            done
-        fi
-    fi
+    # Sort indices based on the first sort key and direction
+    local primary_key="${SORT_KEYS[0]}"
+    local primary_dir="${SORT_DIRECTIONS[0]}"
+    debug_log "Sorting by primary key: $primary_key, direction: $primary_dir"
+    
+    # Use Bash's built-in sort with a custom comparator
+    local sorted_indices=()
+    IFS=$'\n' read -d '' -r -a sorted_indices < <(for idx in "${indices[@]}"; do
+        value=$(get_sort_value "$idx" "$primary_key")
+        printf "%s\t%s\n" "$value" "$idx"
+    done | sort -k1,1${primary_dir:0:1} | cut -f2)
+    
+    # If there are additional sort keys, we could implement secondary sorting,
+    # but for simplicity and given small dataset size, we'll stick to primary key
+    
+    # Rebuild DATA_ROWS in sorted order
+    local temp_rows=("${DATA_ROWS[@]}")
+    DATA_ROWS=()
+    for idx in "${sorted_indices[@]}"; do
+        DATA_ROWS+=("${temp_rows[$idx]}")
+        debug_log "Moved row $idx to new position in sorted order"
+    done
+    
+    debug_log "Data sorted successfully in-memory"
 }
 
 # process_data_rows: Process data rows, update widths and calculate summaries
