@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 # tables.sh - Library for JSON to ANSI tables
-DEBUG_FLAG=false
-declare -r TABLES_VERSION="1.0.2"
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
 declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_number" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
-
 declare -A RED_THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼')
 declare -A BLUE_THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼')
 declare -A THEME
 for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done
-
 # shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
 # shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
@@ -18,7 +14,6 @@ validate_number() { local value="$1"; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "
 validate_kcpu() { local value="$1"; if [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then echo "$value"; else echo "$value"; fi; }
 # shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_kmem() { local value="$1"; if [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo "$value"; fi; }
-
 get_theme() {
     local theme_name="$1"; unset THEME; declare -g -A THEME
     case "${theme_name,,}" in
@@ -30,14 +25,12 @@ get_theme() {
 }
 get_display_length() {
     local text="$1"
-    # Remove ANSI escape sequences using sed (faster than multiple bash substitutions)
     local clean_text
     clean_text=$(echo -n "$text" | sed 's/\x1B\[[0-9;]*[mK]//g')
     echo "${#clean_text}"
 }
 format_with_commas() {
     local num="$1"
-    # Use bash parameter expansion to add commas
     local result="$num"
     while [[ $result =~ ^([0-9]+)([0-9]{3}.*) ]]; do
         result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
@@ -135,12 +128,10 @@ format_kmem() {
 }
 format_display_value() {
     local value="$1" null_value="$2" zero_value="$3" datatype="$4" format="$5" string_limit="$6" wrap_mode="$7" wrap_char="$8" justification="$9"
-    
     local validate_fn="${DATATYPE_HANDLERS[${datatype}_validate]}" format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
     value=$("$validate_fn" "$value")
     local display_value
     display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char" "$justification")
-    
     if [[ "$value" == "null" ]]; then
         case "$null_value" in
             0) display_value="0" ;;
@@ -154,7 +145,6 @@ format_display_value() {
             *) display_value="" ;;
         esac
     fi
-    
     echo "$display_value"
 }
 declare -gx TABLE_TITLE="" TITLE_WIDTH=0 TITLE_POSITION="none"
@@ -411,8 +401,10 @@ update_summaries() {
                 elif [[ "$value" =~ ^[0-9]+K$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%K} / 1000 ))
                 elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Mi} ))
                 elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%Gi} * 1000 )); fi
-            elif [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
+            elif [[ "$datatype" == "int" || "$datatype" == "num" ]]; then
                 if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then local int_value=${value%.*}; [[ "$int_value" == "$value" ]] && int_value=$value; SUM_SUMMARIES[$j]=$((${SUM_SUMMARIES[$j]:-0} + int_value)); fi
+            elif [[ "$datatype" == "float" ]]; then
+                if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then SUM_SUMMARIES[$j]=$(echo "${SUM_SUMMARIES[$j]:-0} + $value" | bc); fi
             fi;;
         min)
             if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
@@ -431,13 +423,6 @@ update_summaries() {
                     local int_value=${value%.*}; [[ "$int_value" == "$value" ]] && int_value=$value; AVG_SUMMARIES[$j]=$((${AVG_SUMMARIES[$j]:-0} + int_value)); AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 )); fi
             fi;;
     esac
-}
-debug_log() { [[ "$DEBUG_FLAG" == "true" ]] && echo "[DEBUG] $(date +%s%3N)ms: $*" >&2; }
-show_help() { cat << 'EOF'
-tables.sh - JSON to ANSI tables
-USAGE: tables.sh <layout_json> <data_json> [OPTIONS] | [--help|--version]
-OPTIONS: --debug, --version, --help
-EOF
 }
 calculate_title_width() {
     local title="$1" total_table_width="$2"
@@ -849,9 +834,16 @@ render_summaries_row() {
                                 summary_value="${formatted_num}M"
                             elif [[ "$datatype" == "num" ]]; then
                                 summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
-                            elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then
+                            elif [[ "$datatype" == "int" ]]; then
                                 summary_value="${SUM_SUMMARIES[$i]}"
                                 [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                            elif [[ "$datatype" == "float" ]]; then
+                                summary_value="${SUM_SUMMARIES[$i]}"
+                                if [[ -n "$format" ]]; then
+                                    summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                                else
+                                    summary_value=$(printf "%.3f" "$summary_value")
+                                fi
                             fi
                         fi
                         ;;
@@ -925,7 +917,7 @@ render_summaries_row() {
     return 1
 }
 draw_table() {
-    local layout_file="$1" data_file="$2" debug=false
+    local layout_file="$1" data_file="$2"
     if [[ "$1" == "--help" || "$1" == "-h" ]]; then show_help; return 0; fi
     if [[ "$1" == "--version" ]]; then echo "tables.sh version $TABLES_VERSION"; return 0; fi
     if [[ $# -eq 0 ]]; then show_help; return 0; fi
@@ -937,13 +929,9 @@ draw_table() {
     shift 2
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --debug) debug=true; shift ;;
-            --version) echo "tables.sh version $TABLES_VERSION"; return 0 ;;
-            --help|-h) show_help; return 0 ;;
             *) echo "Error: Unknown option: $1" >&2; echo "Use --help for usage information" >&2; return 1 ;;
         esac
     done
-    DEBUG_FLAG="$debug"
     validate_input_files "$layout_file" "$data_file" || return 1
     parse_layout_file "$layout_file" || return 1
     get_theme "$THEME_NAME"
@@ -963,120 +951,48 @@ draw_table() {
     render_table_bottom_border
     [[ -n "$TABLE_FOOTER" ]] && render_table_footer "$total_table_width"
 }
-# Main function for command-line usage
 tables_main() {
     draw_table "$@"
 }
-
-# Convenience function to render a table from files
 tables_render() {
     local layout_file="$1" data_file="$2"
     shift 2
     draw_table "$layout_file" "$data_file" "$@"
 }
-
-# Function to render a table from JSON strings (useful when sourced)
 tables_render_from_json() {
     local layout_json="$1" data_json="$2"
     shift 2
-    
-    # Create temporary files
     local temp_layout temp_data
     temp_layout=$(mktemp)
     temp_data=$(mktemp)
-    
-    # Ensure cleanup on exit
     trap 'rm -f "$temp_layout" "$temp_data"' RETURN
-    
-    # Write JSON to temp files
     echo "$layout_json" > "$temp_layout"
     echo "$data_json" > "$temp_data"
-    
-    # Render the table
     draw_table "$temp_layout" "$temp_data" "$@"
 }
-
-# Function to get available themes
 tables_get_themes() {
     echo "Available themes: Red, Blue"
 }
-
-# Function to get version
 tables_version() {
     echo "$TABLES_VERSION"
 }
-
-# Function to reset all global state (useful when sourced)
 tables_reset() {
-    COLUMN_COUNT=0
-    MAX_LINES=1
-    THEME_NAME="Red"
-    TABLE_TITLE=""
-    TITLE_WIDTH=0
-    TITLE_POSITION="none"
-    TABLE_FOOTER=""
-    FOOTER_WIDTH=0
-    FOOTER_POSITION="none"
-    
-    # Reset arrays
-    HEADERS=()
-    KEYS=()
-    JUSTIFICATIONS=()
-    DATATYPES=()
-    NULL_VALUES=()
-    ZERO_VALUES=()
-    FORMATS=()
-    SUMMARIES=()
-    BREAKS=()
-    STRING_LIMITS=()
-    WRAP_MODES=()
-    WRAP_CHARS=()
-    PADDINGS=()
-    WIDTHS=()
-    SORT_KEYS=()
-    SORT_DIRECTIONS=()
-    SORT_PRIORITIES=()
-    IS_WIDTH_SPECIFIED=()
-    VISIBLES=()
-    ROW_JSONS=()
-    DATA_ROWS=()
-    
-    # Reset associative arrays
-    SUM_SUMMARIES=()
-    COUNT_SUMMARIES=()
-    MIN_SUMMARIES=()
-    MAX_SUMMARIES=()
-    UNIQUE_VALUES=()
-    AVG_SUMMARIES=()
-    AVG_COUNTS=()
-    
-    # Reset theme to default
+    COLUMN_COUNT=0 ; MAX_LINES=1 ; THEME_NAME="Red" ; TABLE_TITLE="" ; TITLE_WIDTH=0 ; TITLE_POSITION="none" ; TABLE_FOOTER="" ; FOOTER_WIDTH=0 ; FOOTER_POSITION="none"
+    HEADERS=() ; KEYS=() ; JUSTIFICATIONS=() ; DATATYPES=() ; NULL_VALUES=() ; ZERO_VALUES=() ; FORMATS=() ; SUMMARIES=() ; IS_WIDTH_SPECIFIED=() ; VISIBLES=() 
+    BREAKS=() ; STRING_LIMITS=() ; WRAP_MODES=() ; WRAP_CHARS=() ; PADDINGS=() ; WIDTHS=() ; SORT_KEYS=() ; SORT_DIRECTIONS=() ; SORT_PRIORITIES=() ; ROW_JSONS=() ; DATA_ROWS=()
+    SUM_SUMMARIES=() ; COUNT_SUMMARIES=() ; MIN_SUMMARIES=() ; MAX_SUMMARIES=() ; UNIQUE_VALUES=() ; AVG_SUMMARIES=() ; AVG_COUNTS=()    
     get_theme "$THEME_NAME"
 }
-
-# Export main functions for use when sourced
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
-    # Script is being sourced
     export -f tables_render
     export -f tables_render_from_json
     export -f tables_get_themes
     export -f tables_version
     export -f tables_reset
     export -f draw_table
-    
-    # Also export some utility functions that might be useful
     export -f get_theme
     export -f format_with_commas
     export -f get_display_length
-    
-    echo "Tables library loaded. Available functions:"
-    echo "  tables_render <layout_file> <data_file> [options]"
-    echo "  tables_render_from_json <layout_json> <data_json> [options]"
-    echo "  tables_get_themes"
-    echo "  tables_version"
-    echo "  tables_reset"
-    echo "  draw_table <layout_file> <data_file> [options]"
 else
-    # Script is being run directly
     tables_main "$@"
 fi
