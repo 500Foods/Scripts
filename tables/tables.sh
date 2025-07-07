@@ -3,7 +3,10 @@
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
 declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_number" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
 declare -A THEME
-declare -r RED='\033[0;31m' BLUE='\033[0;34m' GREEN='\033[0;32m' YELLOW='\033[0;33m' CYAN='\033[0;36m' MAGENTA='\033[0;35m' BOLD='\033[1m' DIM='\033[2m' UNDERLINE='\033[4m' NC='\033[0m'
+# Only declare color variables if not already set (prevents readonly variable errors)
+if [[ -z "${RED:-}" ]]; then
+    declare -r RED='\033[0;31m' BLUE='\033[0;34m' GREEN='\033[0;32m' YELLOW='\033[0;33m' CYAN='\033[0;36m' MAGENTA='\033[0;35m' BOLD='\033[1m' DIM='\033[2m' UNDERLINE='\033[4m' NC='\033[0m'
+fi
 replace_color_placeholders() { local text="$1"; text="${text//\{RED\}/$RED}"; text="${text//\{BLUE\}/$BLUE}"; text="${text//\{GREEN\}/$GREEN}"; text="${text//\{YELLOW\}/$YELLOW}"; text="${text//\{CYAN\}/$CYAN}"; text="${text//\{MAGENTA\}/$MAGENTA}"; text="${text//\{BOLD\}/$BOLD}"; text="${text//\{DIM\}/$DIM}"; text="${text//\{UNDERLINE\}/$UNDERLINE}"; text="${text//\{NC\}/$NC}"; echo "$text"; }
 validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
 validate_number() { local value="$1"; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo ""; fi; }
@@ -966,15 +969,12 @@ draw_table() {
     process_data_rows
     local total_table_width
     total_table_width=$(calculate_table_width)
-    
-    # Calculate title and footer widths once with processed content
     if [[ -n "$TABLE_TITLE" ]]; then
         calculate_title_width "$TABLE_TITLE" "$total_table_width"
     fi
     if [[ -n "$TABLE_FOOTER" ]]; then
         calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
     fi
-    
     [[ -n "$TABLE_TITLE" ]] && render_table_title "$total_table_width"
     render_table_top_border
     render_table_headers
