@@ -520,3 +520,92 @@ EOF
 echo -e "\nTest 8-L: Right - Footer greater than table width"
 echo "------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+
+# Test 8-M: Right - Dynamic footer with date calculations (wide table)
+cat > "$data_file" << 'EOF'
+[
+  {
+    "id": 1,
+    "server_name": "web-server-01",
+    "cpu_cores": 4,
+    "memory_gb": 16,
+    "load_avg": 2.45,
+    "status": "Active",
+    "location": "US-East"
+  },
+  {
+    "id": 2,
+    "server_name": "db-server-01",
+    "cpu_cores": 8,
+    "memory_gb": 32,
+    "load_avg": 5.12,
+    "status": "Active",
+    "location": "US-West"
+  },
+  {
+    "id": 3,
+    "server_name": "cache-server",
+    "cpu_cores": 2,
+    "memory_gb": 8,
+    "load_avg": 0.85,
+    "status": "Standby",
+    "location": "EU-Central"
+  }
+]
+EOF
+
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "footer": "Date: $(date +%A) Date: $(date '+%B %d') Time: $(date '+%H:%M:%S')",
+  "footer_position": "right",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Memory (GB)",
+      "key": "memory_gb",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "center"
+    },
+    {
+      "header": "Location",
+      "key": "location",
+      "datatype": "text",
+      "justification": "left"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 8-M: Right - Dynamic footer with date calculations (wide table)"
+echo "------------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
