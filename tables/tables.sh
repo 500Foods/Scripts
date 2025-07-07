@@ -27,7 +27,14 @@ get_display_length() {
     local text="$1"
     local clean_text
     clean_text=$(echo -n "$text" | sed 's/\x1B\[[0-9;]*[mK]//g')
-    echo "${#clean_text}"
+    
+    # Use wc -m for character count (more reliable across platforms)
+    # Fall back to ${#clean_text} if wc fails
+    if command -v wc >/dev/null 2>&1; then
+        echo -n "$clean_text" | wc -m 2>/dev/null || echo "${#clean_text}"
+    else
+        echo "${#clean_text}"
+    fi
 }
 format_with_commas() {
     local num="$1"
@@ -429,9 +436,11 @@ calculate_title_width() {
     if [[ -n "$title" ]]; then
         local evaluated_title
         evaluated_title=$(eval "echo \"$title\"")
-        if [[ "$TITLE_POSITION" == "none" ]]; then TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING)))
+        local title_length
+        title_length=$(get_display_length "$evaluated_title")
+        if [[ "$TITLE_POSITION" == "none" ]]; then TITLE_WIDTH=$((title_length + (2 * DEFAULT_PADDING)))
         elif [[ "$TITLE_POSITION" == "full" ]]; then TITLE_WIDTH=$total_table_width
-        else TITLE_WIDTH=$((${#evaluated_title} + (2 * DEFAULT_PADDING))); [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width; fi
+        else TITLE_WIDTH=$((title_length + (2 * DEFAULT_PADDING))); [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width; fi
     else TITLE_WIDTH=0; fi
 }
 calculate_footer_width() {
@@ -439,9 +448,11 @@ calculate_footer_width() {
     if [[ -n "$footer" ]]; then
         local evaluated_footer
         evaluated_footer=$(eval "echo \"$footer\"")
-        if [[ "$FOOTER_POSITION" == "none" ]]; then FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING)))
+        local footer_length
+        footer_length=$(get_display_length "$evaluated_footer")
+        if [[ "$FOOTER_POSITION" == "none" ]]; then FOOTER_WIDTH=$((footer_length + (2 * DEFAULT_PADDING)))
         elif [[ "$FOOTER_POSITION" == "full" ]]; then FOOTER_WIDTH=$total_table_width
-        else FOOTER_WIDTH=$((${#evaluated_footer} + (2 * DEFAULT_PADDING))); [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width; fi
+        else FOOTER_WIDTH=$((footer_length + (2 * DEFAULT_PADDING))); [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width; fi
     else FOOTER_WIDTH=0; fi
 }
 calculate_table_width() {
