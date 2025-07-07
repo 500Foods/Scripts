@@ -6,6 +6,34 @@ declare -A RED_THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [
 declare -A BLUE_THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼')
 declare -A THEME
 for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done
+
+# Color and formatting variables for placeholder replacement
+declare -r RED='\033[0;31m'
+declare -r BLUE='\033[0;34m'
+declare -r GREEN='\033[0;32m'
+declare -r YELLOW='\033[0;33m'
+declare -r CYAN='\033[0;36m'
+declare -r MAGENTA='\033[0;35m'
+declare -r BOLD='\033[1m'
+declare -r DIM='\033[2m'
+declare -r UNDERLINE='\033[4m'
+declare -r NC='\033[0m'
+
+# Replace color placeholders with actual ANSI codes
+replace_color_placeholders() {
+    local text="$1"
+    text="${text//\{RED\}/$RED}"
+    text="${text//\{BLUE\}/$BLUE}"
+    text="${text//\{GREEN\}/$GREEN}"
+    text="${text//\{YELLOW\}/$YELLOW}"
+    text="${text//\{CYAN\}/$CYAN}"
+    text="${text//\{MAGENTA\}/$MAGENTA}"
+    text="${text//\{BOLD\}/$BOLD}"
+    text="${text//\{DIM\}/$DIM}"
+    text="${text//\{UNDERLINE\}/$UNDERLINE}"
+    text="${text//\{NC\}/$NC}"
+    echo "$text"
+}
 # shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
 # shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
@@ -26,12 +54,21 @@ get_theme() {
 get_display_length() {
     local text="$1"
     local clean_text
-    clean_text=$(echo -n "$text" | sed 's/\x1B\[[0-9;]*[mK]//g')
+    # More comprehensive ANSI escape sequence removal
+    # Handles: colors, cursor movements, formatting, etc.
+    clean_text=$(echo -n "$text" | sed -E 's/\x1B\[[0-9;]*[a-zA-Z]//g')
     
-    # Use wc -m for character count (more reliable across platforms)
-    # Fall back to ${#clean_text} if wc fails
+    # Try to use wc -L for display width if available, otherwise fall back to character count
     if command -v wc >/dev/null 2>&1; then
-        echo -n "$clean_text" | wc -m 2>/dev/null || echo "${#clean_text}"
+        # wc -L gives the length of the longest line (display width)
+        local display_width
+        display_width=$(echo -n "$clean_text" | wc -L 2>/dev/null)
+        if [[ -n "$display_width" && "$display_width" -gt 0 ]]; then
+            echo "$display_width"
+        else
+            # Fall back to character count
+            echo -n "$clean_text" | wc -m 2>/dev/null || echo "${#clean_text}"
+        fi
     else
         echo "${#clean_text}"
     fi
@@ -435,7 +472,9 @@ calculate_title_width() {
     local title="$1" total_table_width="$2"
     if [[ -n "$title" ]]; then
         local evaluated_title
-        evaluated_title=$(eval "echo \"$title\"")
+        evaluated_title=$(eval "echo \"$title\"" 2>/dev/null)
+        evaluated_title=$(replace_color_placeholders "$evaluated_title")
+        evaluated_title=$(printf '%b' "$evaluated_title")
         local title_length
         title_length=$(get_display_length "$evaluated_title")
         if [[ "$TITLE_POSITION" == "none" ]]; then TITLE_WIDTH=$((title_length + (2 * DEFAULT_PADDING)))
@@ -447,7 +486,9 @@ calculate_footer_width() {
     local footer="$1" total_table_width="$2"
     if [[ -n "$footer" ]]; then
         local evaluated_footer
-        evaluated_footer=$(eval "echo \"$footer\"")
+        evaluated_footer=$(eval "echo \"$footer\"" 2>/dev/null)
+        evaluated_footer=$(replace_color_placeholders "$evaluated_footer")
+        evaluated_footer=$(printf '%b' "$evaluated_footer")
         local footer_length
         footer_length=$(get_display_length "$evaluated_footer")
         if [[ "$FOOTER_POSITION" == "none" ]]; then FOOTER_WIDTH=$((footer_length + (2 * DEFAULT_PADDING)))
@@ -467,10 +508,21 @@ calculate_table_width() {
 }
 clip_text() {
     local text="$1" width="$2" justification="$3"
-    if [[ ${#text} -le $width ]]; then
+    local display_length
+    display_length=$(get_display_length "$text")
+    
+    if [[ $display_length -le $width ]]; then
         echo "$text"
         return
     fi
+    
+    # For text with ANSI sequences, we need to be more careful about clipping
+    # Simple approach: if text contains ANSI sequences, don't clip to avoid breaking them
+    if [[ "$text" =~ $'\033\[' ]]; then
+        echo "$text"
+        return
+    fi
+    
     case "$justification" in
         right) echo "${text: -${width}}" ;;
         center) local excess=$(( ${#text} - width )); local left_clip=$(( excess / 2 )); echo "${text:${left_clip}:${width}}" ;;
@@ -492,15 +544,17 @@ render_table_element() {
     if [[ "$element_type" == "title" ]]; then
         [[ -z "$TABLE_TITLE" ]] && return
         element_text=$(eval echo "$TABLE_TITLE" 2>/dev/null)
+        element_text=$(replace_color_placeholders "$element_text")
+        element_text=$(printf '%b' "$element_text")
         element_position="$TITLE_POSITION"
-        calculate_title_width "$element_text" "$total_table_width"
         element_width="$TITLE_WIDTH"
         color_theme="${THEME[header_color]}"
     else
         [[ -z "$TABLE_FOOTER" ]] && return
         element_text=$(eval echo "$TABLE_FOOTER" 2>/dev/null)
+        element_text=$(replace_color_placeholders "$element_text")
+        element_text=$(printf '%b' "$element_text")
         element_position="$FOOTER_POSITION"
-        calculate_footer_width "$element_text" "$total_table_width"
         element_width="$FOOTER_WIDTH"
         color_theme="${THEME[footer_color]}"
     fi
@@ -642,7 +696,6 @@ render_table_bottom_border() {
     total_table_width=$(calculate_table_width)
     local footer_offset=0 footer_right_edge=0 footer_width="" footer_position="none"
     if [[ -n "$TABLE_FOOTER" ]]; then
-        calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
         footer_width=$FOOTER_WIDTH; footer_position=$FOOTER_POSITION
         case "$FOOTER_POSITION" in
             left) footer_offset=0; footer_right_edge=$FOOTER_WIDTH ;;
@@ -952,6 +1005,15 @@ draw_table() {
     process_data_rows
     local total_table_width
     total_table_width=$(calculate_table_width)
+    
+    # Calculate title and footer widths once with processed content
+    if [[ -n "$TABLE_TITLE" ]]; then
+        calculate_title_width "$TABLE_TITLE" "$total_table_width"
+    fi
+    if [[ -n "$TABLE_FOOTER" ]]; then
+        calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
+    fi
+    
     [[ -n "$TABLE_TITLE" ]] && render_table_title "$total_table_width"
     render_table_top_border
     render_table_headers

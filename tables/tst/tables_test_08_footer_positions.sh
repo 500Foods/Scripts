@@ -637,9 +637,9 @@ EOF
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
-  "title": "Server Report - Generated: $(date '+%Y-%m-%d %H:%M:%S')",
+  "title": "Report {RED}──{NC} $(date '+%Y-%m-%d %H:%M:%S')",
   "title_position": "center",
-  "footer": "Report End - Day: $(date +%A) Date: $(date '+%B %d') Time: $(date '+%H:%M:%S')",
+  "footer": "End {RED}──{NC} $(date +%A) {RED}──{NC} $(date '+%B %d') {RED}──{NC} $(date '+%H:%M:%S')",
   "footer_position": "right",
   "columns": [
     {
