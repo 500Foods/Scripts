@@ -2,76 +2,60 @@
 # tables.sh - Library for JSON to ANSI tables
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
 declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_number" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
-declare -A RED_THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼')
-declare -A BLUE_THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼')
 declare -A THEME
-for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done
-
-# Color and formatting variables for placeholder replacement
-declare -r RED='\033[0;31m'
-declare -r BLUE='\033[0;34m'
-declare -r GREEN='\033[0;32m'
-declare -r YELLOW='\033[0;33m'
-declare -r CYAN='\033[0;36m'
-declare -r MAGENTA='\033[0;35m'
-declare -r BOLD='\033[1m'
-declare -r DIM='\033[2m'
-declare -r UNDERLINE='\033[4m'
-declare -r NC='\033[0m'
-
-# Replace color placeholders with actual ANSI codes
-replace_color_placeholders() {
-    local text="$1"
-    text="${text//\{RED\}/$RED}"
-    text="${text//\{BLUE\}/$BLUE}"
-    text="${text//\{GREEN\}/$GREEN}"
-    text="${text//\{YELLOW\}/$YELLOW}"
-    text="${text//\{CYAN\}/$CYAN}"
-    text="${text//\{MAGENTA\}/$MAGENTA}"
-    text="${text//\{BOLD\}/$BOLD}"
-    text="${text//\{DIM\}/$DIM}"
-    text="${text//\{UNDERLINE\}/$UNDERLINE}"
-    text="${text//\{NC\}/$NC}"
-    echo "$text"
-}
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
+declare -r RED='\033[0;31m' BLUE='\033[0;34m' GREEN='\033[0;32m' YELLOW='\033[0;33m' CYAN='\033[0;36m' MAGENTA='\033[0;35m' BOLD='\033[1m' DIM='\033[2m' UNDERLINE='\033[4m' NC='\033[0m'
+replace_color_placeholders() { local text="$1"; text="${text//\{RED\}/$RED}"; text="${text//\{BLUE\}/$BLUE}"; text="${text//\{GREEN\}/$GREEN}"; text="${text//\{YELLOW\}/$YELLOW}"; text="${text//\{CYAN\}/$CYAN}"; text="${text//\{MAGENTA\}/$MAGENTA}"; text="${text//\{BOLD\}/$BOLD}"; text="${text//\{DIM\}/$DIM}"; text="${text//\{UNDERLINE\}/$UNDERLINE}"; text="${text//\{NC\}/$NC}"; echo "$text"; }
 validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_number() { local value="$1"; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo ""; fi; }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_kcpu() { local value="$1"; if [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then echo "$value"; else echo "$value"; fi; }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 validate_kmem() { local value="$1"; if [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo "$value"; fi; }
 get_theme() {
     local theme_name="$1"; unset THEME; declare -g -A THEME
     case "${theme_name,,}" in
-        red) for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done ;;
-        blue) for key in "${!BLUE_THEME[@]}"; do THEME[$key]="${BLUE_THEME[$key]}"; done ;;
-        *) for key in "${!RED_THEME[@]}"; do THEME[$key]="${RED_THEME[$key]}"; done
-           echo -e "${THEME[border_color]}Warning: Unknown theme '$theme_name', using Red${THEME[text_color]}" >&2 ;;
+        red) THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼') ;;
+        blue) THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼') ;;
+        *) THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼'); echo -e "${THEME[border_color]}Warning: Unknown theme '$theme_name', using Red${THEME[text_color]}" >&2 ;;
     esac
 }
 get_display_length() {
     local text="$1"
     local clean_text
-    # More comprehensive ANSI escape sequence removal
-    # Handles: colors, cursor movements, formatting, etc.
     clean_text=$(echo -n "$text" | sed -E 's/\x1B\[[0-9;]*[a-zA-Z]//g')
-    
-    # Try to use wc -L for display width if available, otherwise fall back to character count
-    if command -v wc >/dev/null 2>&1; then
-        # wc -L gives the length of the longest line (display width)
-        local display_width
-        display_width=$(echo -n "$clean_text" | wc -L 2>/dev/null)
-        if [[ -n "$display_width" && "$display_width" -gt 0 ]]; then
-            echo "$display_width"
-        else
-            # Fall back to character count
-            echo -n "$clean_text" | wc -m 2>/dev/null || echo "${#clean_text}"
-        fi
-    else
+    if [[ "$clean_text" =~ ^[[:ascii:]]*$ ]]; then
         echo "${#clean_text}"
+        return
     fi
+    if [[ ! "$clean_text" =~ [^\x00-\x7F] ]]; then
+        echo "${#clean_text}"
+        return
+    fi
+    local codepoints
+    codepoints=$(echo -n "$clean_text" | od -An -tx1 | tr -d ' \n')
+    local width=0 i=0 len=${#codepoints}
+    while [[ $i -lt $len ]]; do
+        local byte1_hex="${codepoints:$i:2}"
+        local byte1=$((0x$byte1_hex))
+        if [[ $byte1 -lt 128 ]]; then
+            ((width++)); ((i += 2))
+        elif [[ $byte1 -lt 224 ]]; then
+            if [[ $((i + 4)) -le $len ]]; then
+                local byte2_hex="${codepoints:$((i+2)):2}"
+                local codepoint=$(( (byte1 & 0x1F) << 6 | (0x$byte2_hex & 0x3F) ))
+                if [[ $codepoint -ge 4352 && $codepoint -le 55215 ]]; then ((width += 2)); else ((width++)); fi
+                ((i += 4))
+            else ((width++)); ((i += 2)); fi
+        elif [[ $byte1 -lt 240 ]]; then
+            if [[ $((i + 6)) -le $len ]]; then
+                local byte2_hex="${codepoints:$((i+2)):2}" byte3_hex="${codepoints:$((i+4)):2}"
+                local codepoint=$(( (byte1 & 0x0F) << 12 | (0x$byte2_hex & 0x3F) << 6 | (0x$byte3_hex & 0x3F) ))
+                if [[ $codepoint -ge 127744 && $codepoint -le 129535 ]] || [[ $codepoint -ge 9728 && $codepoint -le 10175 ]]; then ((width += 2)); else ((width++)); fi
+                ((i += 6))
+            else ((width++)); ((i += 2)); fi
+        else
+            if [[ $((i + 8)) -le $len ]]; then ((width += 2)); ((i += 8)); else ((width++)); ((i += 2)); fi
+        fi
+    done
+    echo "$width"
 }
 format_with_commas() {
     local num="$1"
@@ -81,7 +65,6 @@ format_with_commas() {
     done
     echo "$result"
 }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_text() {
     local value="$1" format="$2" string_limit="$3" wrap_mode="$4" wrap_char="$5" justification="$6"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -100,31 +83,12 @@ format_text() {
         fi
     else echo "$value"; fi
 }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_number() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; [[ -n "$format" && "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && printf '%s' "$value" || echo "$value"; }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
-format_num() {
-    local value="$1" format="$2"
-    if [[ -z "$value" || "$value" == "null" || "$value" == "0" ]]; then
-        echo ""
-        return
-    fi
-    if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        if [[ -n "$format" ]]; then
-            printf '%s' "$value"
-        else
-            format_with_commas "$value"
-        fi
-    else
-        echo "$value"
-    fi
-}
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
+format_num() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then if [[ -n "$format" ]]; then printf '%s' "$value"; else format_with_commas "$value"; fi; else echo "$value"; fi; }
 format_kcpu() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
     [[ "$value" == "0" || "$value" == "0m" ]] && { echo "0m"; return; }
-    
     if [[ "$value" =~ ^[0-9]+m$ ]]; then
         local num_part="${value%m}"
         local formatted_num
@@ -139,12 +103,10 @@ format_kcpu() {
         echo "$value"
     fi
 }
-# shellcheck disable=SC2317  # Called indirectly via DATATYPE_HANDLERS
 format_kmem() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
     [[ "$value" =~ ^0[MKG]$ || "$value" == "0Mi" || "$value" == "0Gi" || "$value" == "0Ki" ]] && { echo "0M"; return; }
-    
     if [[ "$value" =~ ^[0-9]+[KMG]$ ]]; then
         local num_part="${value%[KMG]}"
         local unit="${value: -1}"
@@ -510,22 +472,17 @@ clip_text() {
     local text="$1" width="$2" justification="$3"
     local display_length
     display_length=$(get_display_length "$text")
-    
     if [[ $display_length -le $width ]]; then
         echo "$text"
         return
     fi
-    
-    # For text with ANSI sequences, we need to be more careful about clipping
-    # Simple approach: if text contains ANSI sequences, don't clip to avoid breaking them
     if [[ "$text" =~ $'\033\[' ]]; then
         echo "$text"
         return
     fi
-    
     case "$justification" in
         right) echo "${text: -${width}}" ;;
-        center) local excess=$(( ${#text} - width )); local left_clip=$(( excess / 2 )); echo "${text:${left_clip}:${width}}" ;;
+        center) local excess=$(( display_length - width )); local left_clip=$(( excess / 2 )); echo "${text:${left_clip}:${width}}" ;;
         *) echo "${text:0:${width}}" ;;
     esac
 }
@@ -534,7 +491,7 @@ render_cell() {
     local content_width=$((width - (2 * padding)))
     case "$justification" in
         right) printf "%*s${color}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$padding" "" "$content_width" "$content" "$padding" "" ;;
-        center) local spaces=$(( (content_width - ${#content}) / 2 )); local left_spaces=$(( padding + spaces )); local right_spaces=$(( padding + content_width - ${#content} - spaces )); printf "%*s${color}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$left_spaces" "" "$content" "$right_spaces" "" ;;
+        center) local content_len; content_len=$(get_display_length "$content"); local spaces=$(( (content_width - content_len) / 2 )); local left_spaces=$(( padding + spaces )); local right_spaces=$(( padding + content_width - content_len - spaces )); printf "%*s${color}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$left_spaces" "" "$content" "$right_spaces" "" ;;
         *) printf "%*s${color}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$padding" "" "$content_width" "$content" "$padding" "" ;;
     esac
 }
@@ -579,8 +536,8 @@ render_table_element() {
     case "$element_position" in
         left) printf "%*s${color_theme}%-*s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
         right) printf "%*s${color_theme}%*s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
-        center) printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$element_text" "$((available_width - ${#element_text} + DEFAULT_PADDING))" "" ;;
-        full) local text_len=${#element_text}; local spaces=$(( (available_width - text_len) / 2 )); local left_spaces=$(( DEFAULT_PADDING + spaces )); local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces )); printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$left_spaces" "" "$element_text" "$right_spaces" "" ;;
+        center) local element_len; element_len=$(get_display_length "$element_text"); printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$element_text" "$((available_width - element_len + DEFAULT_PADDING))" "" ;;
+        full) local text_len; text_len=$(get_display_length "$element_text"); local spaces=$(( (available_width - text_len) / 2 )); local left_spaces=$(( DEFAULT_PADDING + spaces )); local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces )); printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$left_spaces" "" "$element_text" "$right_spaces" "" ;;
         *) printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$element_text" "$DEFAULT_PADDING" "" ;;
     esac
     printf "${THEME[border_color]}%s${THEME[text_color]}\n" "${THEME[v_line]}"
@@ -774,13 +731,14 @@ render_data_rows() {
                 for k in "${!parts[@]}"; do
                     local part="${parts[k]}"
                     local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
-                    if [[ ${#part} -gt $content_width ]]; then
+                    local part_len; part_len=$(get_display_length "$part")
+                    if [[ $part_len -gt $content_width ]]; then
                         case "${JUSTIFICATIONS[$j]}" in
                             right)
                                 part="${part: -${content_width}}"
                                 ;;
                             center)
-                                local excess=$(( ${#part} - content_width ))
+                                local excess=$(( part_len - content_width ))
                                 local left_clip=$(( excess / 2 ))
                                 part="${part:${left_clip}:${content_width}}"
                                 ;;
@@ -816,13 +774,14 @@ render_data_rows() {
                 [[ $line_index -gt $row_line_count ]] && row_line_count=$line_index
             else
                 local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
-                if [[ ${#display_value} -gt $content_width ]]; then
+                local display_len; display_len=$(get_display_length "$display_value")
+                if [[ $display_len -gt $content_width ]]; then
                     case "${JUSTIFICATIONS[$j]}" in
                         right)
                             display_value="${display_value: -${content_width}}"
                             ;;
                         center)
-                            local excess=$(( ${#display_value} - content_width ))
+                            local excess=$(( display_len - content_width ))
                             local left_clip=$(( excess / 2 ))
                             display_value="${display_value:${left_clip}:${content_width}}"
                             ;;
@@ -842,13 +801,14 @@ render_data_rows() {
                     local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
                     
                     # Clip the display value if it exceeds the content width and a width is specified
-                    if [[ ${#display_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                    local display_value_len; display_value_len=$(get_display_length "$display_value")
+                    if [[ $display_value_len -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
                         case "${JUSTIFICATIONS[$j]}" in
                             right)
                                 display_value="${display_value: -$content_width}"
                                 ;;
                             center)
-                                local excess=$(( ${#display_value} - content_width ))
+                                local excess=$(( display_value_len - content_width ))
                                 local left_clip=$(( excess / 2 ))
                                 display_value="${display_value:$left_clip:$content_width}"
                                 ;;
@@ -957,13 +917,14 @@ render_summaries_row() {
                         ;;
                 esac
                 local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
-                if [[ ${#summary_value} -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
+                local summary_value_len; summary_value_len=$(get_display_length "$summary_value")
+                if [[ $summary_value_len -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
                     case "${JUSTIFICATIONS[$i]}" in
                         right)
                                 summary_value="${summary_value: -$content_width}"
                             ;;
                         center)
-                            local excess=$(( ${#summary_value} - content_width ))
+                            local excess=$(( summary_value_len - content_width ))
                             local left_clip=$(( excess / 2 ))
                             summary_value="${summary_value:$left_clip:$content_width}"
                             ;;
@@ -1024,48 +985,14 @@ draw_table() {
     render_table_bottom_border
     [[ -n "$TABLE_FOOTER" ]] && render_table_footer "$total_table_width"
 }
-tables_main() {
-    draw_table "$@"
-}
-tables_render() {
-    local layout_file="$1" data_file="$2"
-    shift 2
-    draw_table "$layout_file" "$data_file" "$@"
-}
-tables_render_from_json() {
-    local layout_json="$1" data_json="$2"
-    shift 2
-    local temp_layout temp_data
-    temp_layout=$(mktemp)
-    temp_data=$(mktemp)
-    trap 'rm -f "$temp_layout" "$temp_data"' RETURN
-    echo "$layout_json" > "$temp_layout"
-    echo "$data_json" > "$temp_data"
-    draw_table "$temp_layout" "$temp_data" "$@"
-}
-tables_get_themes() {
-    echo "Available themes: Red, Blue"
-}
-tables_version() {
-    echo "$TABLES_VERSION"
-}
-tables_reset() {
-    COLUMN_COUNT=0 ; MAX_LINES=1 ; THEME_NAME="Red" ; TABLE_TITLE="" ; TITLE_WIDTH=0 ; TITLE_POSITION="none" ; TABLE_FOOTER="" ; FOOTER_WIDTH=0 ; FOOTER_POSITION="none"
-    HEADERS=() ; KEYS=() ; JUSTIFICATIONS=() ; DATATYPES=() ; NULL_VALUES=() ; ZERO_VALUES=() ; FORMATS=() ; SUMMARIES=() ; IS_WIDTH_SPECIFIED=() ; VISIBLES=() 
-    BREAKS=() ; STRING_LIMITS=() ; WRAP_MODES=() ; WRAP_CHARS=() ; PADDINGS=() ; WIDTHS=() ; SORT_KEYS=() ; SORT_DIRECTIONS=() ; SORT_PRIORITIES=() ; ROW_JSONS=() ; DATA_ROWS=()
-    SUM_SUMMARIES=() ; COUNT_SUMMARIES=() ; MIN_SUMMARIES=() ; MAX_SUMMARIES=() ; UNIQUE_VALUES=() ; AVG_SUMMARIES=() ; AVG_COUNTS=()    
-    get_theme "$THEME_NAME"
-}
+tables_main() { draw_table "$@"; }
+tables_render() { local layout_file="$1" data_file="$2"; shift 2; draw_table "$layout_file" "$data_file" "$@"; }
+tables_render_from_json() { local layout_json="$1" data_json="$2"; shift 2; local temp_layout temp_data; temp_layout=$(mktemp); temp_data=$(mktemp); trap 'rm -f "$temp_layout" "$temp_data"' RETURN; echo "$layout_json" > "$temp_layout"; echo "$data_json" > "$temp_data"; draw_table "$temp_layout" "$temp_data" "$@"; }
+tables_get_themes() { echo "Available themes: Red, Blue"; }
+tables_version() { echo "$TABLES_VERSION"; }
+tables_reset() { COLUMN_COUNT=0; MAX_LINES=1; THEME_NAME="Red"; TABLE_TITLE=""; TITLE_WIDTH=0; TITLE_POSITION="none"; TABLE_FOOTER=""; FOOTER_WIDTH=0; FOOTER_POSITION="none"; HEADERS=(); KEYS=(); JUSTIFICATIONS=(); DATATYPES=(); NULL_VALUES=(); ZERO_VALUES=(); FORMATS=(); SUMMARIES=(); IS_WIDTH_SPECIFIED=(); VISIBLES=(); BREAKS=(); STRING_LIMITS=(); WRAP_MODES=(); WRAP_CHARS=(); PADDINGS=(); WIDTHS=(); SORT_KEYS=(); SORT_DIRECTIONS=(); SORT_PRIORITIES=(); ROW_JSONS=(); DATA_ROWS=(); SUM_SUMMARIES=(); COUNT_SUMMARIES=(); MIN_SUMMARIES=(); MAX_SUMMARIES=(); UNIQUE_VALUES=(); AVG_SUMMARIES=(); AVG_COUNTS=(); get_theme "$THEME_NAME"; }
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
-    export -f tables_render
-    export -f tables_render_from_json
-    export -f tables_get_themes
-    export -f tables_version
-    export -f tables_reset
-    export -f draw_table
-    export -f get_theme
-    export -f format_with_commas
-    export -f get_display_length
+    export -f tables_render tables_render_from_json tables_get_themes tables_version tables_reset draw_table get_theme format_with_commas get_display_length
 else
     tables_main "$@"
 fi

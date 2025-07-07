@@ -1133,3 +1133,51 @@ EOF
 echo -e "\nTest 9-U: Dual dynamic commands in footer"
 echo "----------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+
+# Test 9-V: Multiple double-wide emojis in title and footer
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "🚀 Server Status 📊 Performance Report 🌟 $(date +%Y-%m-%d) 💻",
+  "footer": "✅ Data Complete 🔥 Analysis Ready 📈 Generated $(date +%H:%M:%S) 🎯",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right",
+      "summary": "count"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "Category",
+      "key": "category",
+      "datatype": "text",
+      "justification": "center",
+      "summary": "unique"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right",
+      "summary": "sum"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "center"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 9-V: Multiple double-wide emojis in title and footer"
+echo "-------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG

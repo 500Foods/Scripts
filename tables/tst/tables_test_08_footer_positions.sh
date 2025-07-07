@@ -691,3 +691,62 @@ EOF
 echo -e "\nTest 8-N: Dynamic title and footer with date calculations (testing both elements)"
 echo "------------------------------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+
+# Test 8-O: Unicode double-width characters (emojis and checkmarks)
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "Report {RED}──{NC} $(date '+%Y-%m-%d %H:%M:%S') 😊",
+  "title_position": "center",
+  "footer": "✓ End {RED}──{NC} $(date +%A) {RED}──{NC} $(date '+%B %d') {RED}──{NC} $(date '+%H:%M:%S') ✓",
+  "footer_position": "right",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Memory (GB)",
+      "key": "memory_gb",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "center"
+    },
+    {
+      "header": "Location",
+      "key": "location",
+      "datatype": "text",
+      "justification": "left"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 8-O: Unicode double-width characters (emojis and checkmarks)"
+echo "----------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
