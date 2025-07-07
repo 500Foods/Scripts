@@ -255,15 +255,15 @@ parse_sort_config() {
 }
 declare -a ROW_JSONS=()
 declare -A SUM_SUMMARIES=() COUNT_SUMMARIES=() MIN_SUMMARIES=() MAX_SUMMARIES=()
-declare -A UNIQUE_VALUES=() AVG_SUMMARIES=() AVG_COUNTS=()
+declare -A UNIQUE_VALUES=() AVG_SUMMARIES=() AVG_COUNTS=() MAX_DECIMAL_PLACES=()
 declare -a IS_WIDTH_SPECIFIED=()
 declare -a DATA_ROWS=()
 initialize_summaries() {
     SUM_SUMMARIES=(); COUNT_SUMMARIES=(); MIN_SUMMARIES=(); MAX_SUMMARIES=()
-    UNIQUE_VALUES=(); AVG_SUMMARIES=(); AVG_COUNTS=()
+    UNIQUE_VALUES=(); AVG_SUMMARIES=(); AVG_COUNTS=(); MAX_DECIMAL_PLACES=()
     for ((i=0; i<COLUMN_COUNT; i++)); do
         SUM_SUMMARIES[$i]=0; COUNT_SUMMARIES[$i]=0; MIN_SUMMARIES[$i]=""; MAX_SUMMARIES[$i]=""
-        UNIQUE_VALUES[$i]=""; AVG_SUMMARIES[$i]=0; AVG_COUNTS[$i]=0
+        UNIQUE_VALUES[$i]=""; AVG_SUMMARIES[$i]=0; AVG_COUNTS[$i]=0; MAX_DECIMAL_PLACES[$i]=0
     done
 }
 prepare_data() {
@@ -381,7 +381,7 @@ process_data_rows() {
                 avg)
                     if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
                         local avg_result
-                        avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))
+                        avg_result=$(awk "BEGIN { print ${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]} }")
                         if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result")
                         elif [[ "$datatype" == "float" ]]; then
                             if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then local decimals="${BASH_REMATCH[1]}"; summary_value=$(printf "%.${decimals}f" "$avg_result")
@@ -401,6 +401,17 @@ process_data_rows() {
 }
 update_summaries() {
     local j="$1" value="$2" datatype="$3" summary_type="$4"
+    # Track maximum decimal places for float data type
+    if [[ "$datatype" == "float" && "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        local decimal_part="${value#*.}"
+        local decimal_places=0
+        if [[ -n "$decimal_part" && "$decimal_part" != "$value" ]]; then
+            decimal_places=${#decimal_part}
+        fi
+        if [[ $decimal_places -gt ${MAX_DECIMAL_PLACES[$j]:-0} ]]; then
+            MAX_DECIMAL_PLACES[$j]=$decimal_places
+        fi
+    fi
     case "$summary_type" in
         sum)
             if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%m} ))
@@ -429,7 +440,14 @@ update_summaries() {
         avg)
             if [[ "$datatype" == "int" || "$datatype" == "float" || "$datatype" == "num" ]]; then
                 if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                    local int_value=${value%.*}; [[ "$int_value" == "$value" ]] && int_value=$value; AVG_SUMMARIES[$j]=$((${AVG_SUMMARIES[$j]:-0} + int_value)); AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 )); fi
+                    if [[ "$datatype" == "float" ]]; then
+                        # Use bc to add floating-point values for precision
+                        AVG_SUMMARIES[$j]=$(echo "${AVG_SUMMARIES[$j]:-0} + $value" | bc)
+                    else
+                        local int_value=${value%.*}; [[ "$int_value" == "$value" ]] && int_value=$value; AVG_SUMMARIES[$j]=$((${AVG_SUMMARIES[$j]:-0} + int_value))
+                    fi
+                    AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 ))
+                fi
             fi;;
     esac
 }
@@ -869,18 +887,29 @@ render_summaries_row() {
                                 if [[ -n "$format" ]]; then
                                     summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
                                 else
-                                    summary_value=$(printf "%.3f" "$summary_value")
+                                    local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
+                                    summary_value=$(printf "%.${decimals}f" "$summary_value")
                                 fi
                             fi
                         fi
                         ;;
                     min)
                         summary_value="${MIN_SUMMARIES[$i]:-}"
-                        [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        if [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
+                            local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
+                            summary_value=$(printf "%.${decimals}f" "$summary_value")
+                        elif [[ -n "$format" ]]; then
+                            summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        fi
                         ;;
                     max)
                         summary_value="${MAX_SUMMARIES[$i]:-}"
-                        [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        if [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
+                            local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
+                            summary_value=$(printf "%.${decimals}f" "$summary_value")
+                        elif [[ -n "$format" ]]; then
+                            summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
+                        fi
                         ;;
                     count)
                         summary_value="${COUNT_SUMMARIES[$i]:-0}"
@@ -895,24 +924,20 @@ render_summaries_row() {
                     avg)
                         if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
                             local avg_result
-                            # Use bash arithmetic for division (will be integer division, but good enough for most cases)
-                            avg_result=$((${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}))
-                            
-                            # Format based on datatype
-                            if [[ "$datatype" == "int" ]]; then
-                                summary_value=$(printf "%.0f" "$avg_result")
-                            elif [[ "$datatype" == "float" ]]; then
-                                # Use same decimal precision as format if available, otherwise 2 decimals
-                                if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then
-                                    local decimals="${BASH_REMATCH[1]}"
-                                    summary_value=$(printf "%.${decimals}f" "$avg_result")
-                                else
-                                    summary_value=$(printf "%.2f" "$avg_result")
-                                fi
-                            elif [[ "$datatype" == "num" ]]; then
-                                summary_value=$(format_num "$avg_result" "$format")
+                            if [[ "$datatype" == "float" ]]; then
+                                local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
+                                avg_result=$(awk "BEGIN {printf \"%.${decimals}f\", (${AVG_SUMMARIES[$i]}) / (${AVG_COUNTS[$i]})}")
+                                summary_value=$(printf "%.${decimals}f" "$avg_result")
                             else
-                                summary_value="$avg_result"
+                                # Use bash arithmetic for division for non-float types
+                                avg_result=$((${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}))
+                                if [[ "$datatype" == "int" ]]; then
+                                    summary_value=$(printf "%.0f" "$avg_result")
+                                elif [[ "$datatype" == "num" ]]; then
+                                    summary_value=$(format_num "$avg_result" "$format")
+                                else
+                                    summary_value="$avg_result"
+                                fi
                             fi
                         else
                             summary_value="0"
