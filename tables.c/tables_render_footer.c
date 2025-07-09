@@ -35,8 +35,9 @@ void render_bottom_border_with_footer(TableConfig *config, int total_width, int 
     if (footer_present) {
         int footer_start = footer_padding;
         int footer_end = footer_padding + box_width - 1;
+        int max_width = (footer_end >= total_width) ? footer_end + 1 : total_width;
 
-        for (int i = 0; i < total_width; i++) {
+        for (int i = 0; i < max_width; i++) {
             int is_col_junct = 0;
             if (column_positions) {
                 for (int k = 0; k < col_pos_count; k++) {
@@ -49,8 +50,16 @@ void render_bottom_border_with_footer(TableConfig *config, int total_width, int 
 
             if (i == 0) {
                 printf("%s", (footer_start == 0) ? config->theme.l_junct : config->theme.bl_corner);
-            } else if (i == total_width - 1) {
-                printf("%s", (footer_end >= total_width - 1) ? config->theme.r_junct : config->theme.br_corner);
+            } else if (i == max_width - 1) {
+                if (footer_end > total_width - 1) {
+                    printf("%s", config->theme.tr_corner);  // Footer extends beyond table
+                } else if (footer_end == total_width - 1) {
+                    printf("%s", config->theme.r_junct);    // Footer ends exactly at table edge
+                } else {
+                    printf("%s", config->theme.br_corner);  // Normal bottom-right corner
+                }
+            } else if (i == total_width - 1 && footer_end > total_width - 1) {
+                printf("%s", config->theme.b_junct);  // Junction at table edge when footer extends beyond
             } else if (i == footer_start) {
                 printf("%s", is_col_junct ? config->theme.cross : config->theme.t_junct);
             } else if (i == footer_end) {
@@ -190,8 +199,8 @@ void render_footer(TableConfig *config, int total_width) {
     if (config->footer_pos == POSITION_FULL) {
         // For full position, center the text within the available width (excluding borders)
         int spaces = (available_width - text_width) / 2;
-        left_padding = 1 + spaces;  // DEFAULT_PADDING + spaces
-        right_padding = 1 + available_width - text_width - spaces;  // DEFAULT_PADDING + available_width - text_width - spaces
+        left_padding = spaces;  // Just the calculated spaces, no additional padding
+        right_padding = available_width - text_width - spaces;  // Remaining space
     }
 
     printf("%*s%s%s%*s", left_padding, "", config->theme.footer_color, clipped_text, right_padding, "");

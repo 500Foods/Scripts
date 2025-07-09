@@ -97,7 +97,7 @@ void render_title(TableConfig *config, int total_width) {
         right_padding = box_width - text_width - left_padding;
     }
 
-    printf("%*s%s%s%*s", left_padding, "", config->theme.caption_color, clipped_text, right_padding, "");
+    printf("%*s%s%s%*s", left_padding, "", config->theme.header_color, clipped_text, right_padding, "");
     printf("%s%s\n", config->theme.border_color, config->theme.v_line);
     
     free(clipped_text);

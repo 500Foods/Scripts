@@ -8,18 +8,12 @@ if [[ -z "${RED:-}" ]]; then
     declare -r RED='\033[0;31m' BLUE='\033[0;34m' GREEN='\033[0;32m' YELLOW='\033[0;33m' CYAN='\033[0;36m' MAGENTA='\033[0;35m' BOLD='\033[1m' DIM='\033[2m' UNDERLINE='\033[4m' NC='\033[0m'
 fi
 replace_color_placeholders() { local text="$1"; text="${text//\{RED\}/$RED}"; text="${text//\{BLUE\}/$BLUE}"; text="${text//\{GREEN\}/$GREEN}"; text="${text//\{YELLOW\}/$YELLOW}"; text="${text//\{CYAN\}/$CYAN}"; text="${text//\{MAGENTA\}/$MAGENTA}"; text="${text//\{BOLD\}/$BOLD}"; text="${text//\{DIM\}/$DIM}"; text="${text//\{UNDERLINE\}/$UNDERLINE}"; text="${text//\{NC\}/$NC}"; text="${text//\{RESET\}/$NC}"; echo "$text"; }
-validate_text() { local value="$1"; [[ "$value" != "null" ]] && echo "$value" || echo ""; }
-validate_number() { local value="$1"; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo ""; fi; }
-validate_kcpu() { local value="$1"; if [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then echo "$value"; else echo "$value"; fi; }
-validate_kmem() { local value="$1"; if [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]]; then echo "$value"; else echo "$value"; fi; }
-get_theme() {
-    local theme_name="$1"; unset THEME; declare -g -A THEME
-    case "${theme_name,,}" in
-        red) THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼') ;;
-        blue) THEME=([border_color]='\033[0;34m' [caption_color]='\033[0;34m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼') ;;
-        *) THEME=([border_color]='\033[0;31m' [caption_color]='\033[0;32m' [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼'); echo -e "${THEME[border_color]}Warning: Unknown theme '$theme_name', using Red${THEME[text_color]}" >&2 ;;
-    esac
-}
+validate_data() { local value="$1" type="$2"; case "$type" in text) [[ "$value" != "null" ]] && echo "$value" || echo "";; number|int|float|num) [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]] && echo "$value" || echo "";; kcpu) [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && echo "$value" || echo "$value";; kmem) [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]] && echo "$value" || echo "$value";; *) echo "$value";; esac; }
+validate_text() { validate_data "$1" "text"; }
+validate_number() { validate_data "$1" "number"; }
+validate_kcpu() { validate_data "$1" "kcpu"; }
+validate_kmem() { validate_data "$1" "kmem"; }
+get_theme() { local theme_name="$1"; unset THEME; declare -g -A THEME; local border_color caption_color; case "${theme_name,,}" in red) border_color='\033[0;31m'; caption_color='\033[0;32m';; blue) border_color='\033[0;34m'; caption_color='\033[0;34m';; *) border_color='\033[0;31m'; caption_color='\033[0;32m'; echo -e "${border_color}Warning: Unknown theme '$theme_name', using Red\033[0m" >&2;; esac; THEME=([border_color]="$border_color" [caption_color]="$caption_color" [header_color]='\033[1;37m' [footer_color]='\033[0;36m' [summary_color]='\033[1;37m' [text_color]='\033[0m' [tl_corner]='╭' [tr_corner]='╮' [bl_corner]='╰' [br_corner]='╯' [h_line]='─' [v_line]='│' [t_junct]='┬' [b_junct]='┴' [l_junct]='├' [r_junct]='┤' [cross]='┼'); }
 get_display_length() {
     local text="$1"
     local clean_text
@@ -86,8 +80,9 @@ format_text() {
         fi
     else echo "$value"; fi
 }
-format_number() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; [[ -n "$format" && "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && printf '%s' "$value" || echo "$value"; }
-format_num() { local value="$1" format="$2"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then if [[ -n "$format" ]]; then printf '%s' "$value"; else format_with_commas "$value"; fi; else echo "$value"; fi; }
+format_numeric() { local value="$1" format="$2" use_commas="$3"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then if [[ -n "$format" ]]; then printf '%s' "$value"; elif [[ "$use_commas" == "true" ]]; then format_with_commas "$value"; else echo "$value"; fi; else echo "$value"; fi; }
+format_number() { format_numeric "$1" "$2" "false"; }
+format_num() { format_numeric "$1" "$2" "true"; }
 format_kcpu() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -354,42 +349,8 @@ process_data_rows() {
     done
     for ((j=0; j<COLUMN_COUNT; j++)); do
         if [[ "${SUMMARIES[$j]}" != "none" ]]; then
-            local summary_value="" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}"
-            case "${SUMMARIES[$j]}" in
-                sum)
-                    if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
-                        if [[ "$datatype" == "kcpu" ]]; then
-                            local formatted_num
-                            formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
-                            summary_value="${formatted_num}m"
-                        elif [[ "$datatype" == "kmem" ]]; then
-                            local formatted_num
-                            formatted_num=$(format_with_commas "${SUM_SUMMARIES[$j]}")
-                            summary_value="${formatted_num}M"
-                        elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format")
-                        elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then summary_value="${SUM_SUMMARIES[$j]}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value"); fi
-                    fi;;
-                min) summary_value="${MIN_SUMMARIES[$j]:-}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value");;
-                max) summary_value="${MAX_SUMMARIES[$j]:-}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value");;
-                count) summary_value="${COUNT_SUMMARIES[$j]:-0}";;
-                unique)
-                    if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then
-                        local unique_count
-                        unique_count=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l)
-                        summary_value="$unique_count"
-                    else summary_value="0"; fi;;
-                avg)
-                    if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
-                        local avg_result
-                        avg_result=$(awk "BEGIN { print ${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]} }")
-                        if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result")
-                        elif [[ "$datatype" == "float" ]]; then
-                            if [[ -n "$format" && "$format" =~ %.([0-9]+)f ]]; then local decimals="${BASH_REMATCH[1]}"; summary_value=$(printf "%.${decimals}f" "$avg_result")
-                            else summary_value=$(printf "%.2f" "$avg_result"); fi
-                        elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "$avg_result" "$format")
-                        else summary_value="$avg_result"; fi
-                    else summary_value="0"; fi;;
-            esac
+            local summary_value
+            summary_value=$(format_summary_value "$j" "${SUMMARIES[$j]}" "${DATATYPES[$j]}" "${FORMATS[$j]}")
             if [[ -n "$summary_value" && "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
                 local summary_len
                 summary_len=$(get_display_length "$summary_value")
@@ -467,34 +428,10 @@ update_summaries() {
             fi;;
     esac
 }
-calculate_title_width() {
-    local title="$1" total_table_width="$2"
-    if [[ -n "$title" ]]; then
-        local evaluated_title
-        evaluated_title=$(eval "echo \"$title\"" 2>/dev/null)
-        evaluated_title=$(replace_color_placeholders "$evaluated_title")
-        evaluated_title=$(printf '%b' "$evaluated_title")
-        local title_length
-        title_length=$(get_display_length "$evaluated_title")
-        if [[ "$TITLE_POSITION" == "none" ]]; then TITLE_WIDTH=$((title_length + (2 * DEFAULT_PADDING)))
-        elif [[ "$TITLE_POSITION" == "full" ]]; then TITLE_WIDTH=$total_table_width
-        else TITLE_WIDTH=$((title_length + (2 * DEFAULT_PADDING))); [[ $TITLE_WIDTH -gt $total_table_width ]] && TITLE_WIDTH=$total_table_width; fi
-    else TITLE_WIDTH=0; fi
-}
-calculate_footer_width() {
-    local footer="$1" total_table_width="$2"
-    if [[ -n "$footer" ]]; then
-        local evaluated_footer
-        evaluated_footer=$(eval "echo \"$footer\"" 2>/dev/null)
-        evaluated_footer=$(replace_color_placeholders "$evaluated_footer")
-        evaluated_footer=$(printf '%b' "$evaluated_footer")
-        local footer_length
-        footer_length=$(get_display_length "$evaluated_footer")
-        if [[ "$FOOTER_POSITION" == "none" ]]; then FOOTER_WIDTH=$((footer_length + (2 * DEFAULT_PADDING)))
-        elif [[ "$FOOTER_POSITION" == "full" ]]; then FOOTER_WIDTH=$total_table_width
-        else FOOTER_WIDTH=$((footer_length + (2 * DEFAULT_PADDING))); [[ $FOOTER_WIDTH -gt $total_table_width ]] && FOOTER_WIDTH=$total_table_width; fi
-    else FOOTER_WIDTH=0; fi
-}
+format_summary_value() { local j="$1" summary_type="$2" datatype="$3" format="$4" summary_value=""; case "$summary_type" in sum) if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then if [[ "$datatype" == "kcpu" ]]; then summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")m"; elif [[ "$datatype" == "kmem" ]]; then summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")M"; elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format"); elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then summary_value="${SUM_SUMMARIES[$j]}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value"); fi; fi;; min) summary_value="${MIN_SUMMARIES[$j]:-}"; if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")m"; elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")M"; elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then summary_value=$(printf "%.${MAX_DECIMAL_PLACES[$j]:-2}f" "$summary_value"); elif [[ -n "$format" ]]; then summary_value=$(printf '%s' "$summary_value"); fi;; max) summary_value="${MAX_SUMMARIES[$j]:-}"; if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")m"; elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")M"; elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then summary_value=$(printf "%.${MAX_DECIMAL_PLACES[$j]:-2}f" "$summary_value"); elif [[ -n "$format" ]]; then summary_value=$(printf '%s' "$summary_value"); fi;; count) summary_value="${COUNT_SUMMARIES[$j]:-0}";; unique) if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then summary_value=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l); else summary_value="0"; fi;; avg) if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then if [[ "$datatype" == "float" ]]; then local decimals=${MAX_DECIMAL_PLACES[$j]:-2}; summary_value=$(awk "BEGIN {printf \"%.${decimals}f\", (${AVG_SUMMARIES[$j]}) / (${AVG_COUNTS[$j]})}"); else local avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]})); if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result"); elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "$avg_result" "$format"); else summary_value="$avg_result"; fi; fi; else summary_value="0"; fi;; esac; echo "$summary_value"; }
+calculate_element_width() { local text="$1" total_table_width="$2" position="$3" width_var="$4"; if [[ -n "$text" ]]; then local evaluated_text; evaluated_text=$(eval "echo \"$text\"" 2>/dev/null); evaluated_text=$(replace_color_placeholders "$evaluated_text"); evaluated_text=$(printf '%b' "$evaluated_text"); local text_length; text_length=$(get_display_length "$evaluated_text"); if [[ "$position" == "none" ]]; then declare -g "$width_var"=$((text_length + (2 * DEFAULT_PADDING))); elif [[ "$position" == "full" ]]; then declare -g "$width_var"=$total_table_width; else declare -g "$width_var"=$((text_length + (2 * DEFAULT_PADDING))); [[ ${!width_var} -gt $total_table_width ]] && declare -g "$width_var"=$total_table_width; fi; else declare -g "$width_var"=0; fi; }
+calculate_title_width() { calculate_element_width "$1" "$2" "$TITLE_POSITION" "TITLE_WIDTH"; }
+calculate_footer_width() { calculate_element_width "$1" "$2" "$FOOTER_POSITION" "FOOTER_WIDTH"; }
 calculate_table_width() {
     local total_table_width=0 visible_count=0
     for ((i=0; i<COLUMN_COUNT; i++)); do
@@ -584,9 +521,6 @@ render_table_element() {
         for i in $(seq 1 "$element_width"); do echo -ne "${THEME[h_line]}"; done
         echo -ne "${THEME[br_corner]}${THEME[text_color]}\n"
     fi
-}
-render_table_title() {
-    render_table_element "title" "$1"
 }
 render_table_border() {
     local border_type="$1" total_table_width="$2" element_offset="$3" element_right_edge="$4" element_width="$5"
@@ -886,9 +820,6 @@ render_data_rows() {
         done
     done
 }
-render_table_footer() {
-    render_table_element "footer" "$1"
-}
 render_summaries_row() {
     local has_summaries=false
     for ((i=0; i<COLUMN_COUNT; i++)); do
@@ -899,97 +830,8 @@ render_summaries_row() {
         printf "${THEME[border_color]}%s${THEME[text_color]}" "${THEME[v_line]}"
         for ((i=0; i<COLUMN_COUNT; i++)); do
             if [[ "${VISIBLES[i]}" == "true" ]]; then
-                local summary_value="" datatype="${DATATYPES[$i]}" format="${FORMATS[$i]}"
-                case "${SUMMARIES[$i]}" in
-                    sum)
-                        if [[ -n "${SUM_SUMMARIES[$i]}" && "${SUM_SUMMARIES[$i]}" != "0" ]]; then
-                            if [[ "$datatype" == "kcpu" ]]; then
-                                local formatted_num
-                                formatted_num=$(format_with_commas "${SUM_SUMMARIES[$i]}")
-                                summary_value="${formatted_num}m"
-                            elif [[ "$datatype" == "kmem" ]]; then
-                                local formatted_num
-                                formatted_num=$(format_with_commas "${SUM_SUMMARIES[$i]}")
-                                summary_value="${formatted_num}M"
-                            elif [[ "$datatype" == "num" ]]; then
-                                summary_value=$(format_num "${SUM_SUMMARIES[$i]}" "$format")
-                            elif [[ "$datatype" == "int" ]]; then
-                                summary_value="${SUM_SUMMARIES[$i]}"
-                                [[ -n "$format" ]] && summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                            elif [[ "$datatype" == "float" ]]; then
-                                summary_value="${SUM_SUMMARIES[$i]}"
-                                if [[ -n "$format" ]]; then
-                                    summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                                else
-                                    local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
-                                    summary_value=$(printf "%.${decimals}f" "$summary_value")
-                                fi
-                            fi
-                        fi
-                        ;;
-                    min)
-                        summary_value="${MIN_SUMMARIES[$i]:-}"
-                        if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
-                            local formatted_num=$(format_with_commas "$summary_value")
-                            summary_value="${formatted_num}m"
-                        elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
-                            local formatted_num=$(format_with_commas "$summary_value")
-                            summary_value="${formatted_num}M"
-                        elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
-                            local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
-                            summary_value=$(printf "%.${decimals}f" "$summary_value")
-                        elif [[ -n "$format" ]]; then
-                            summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                        fi
-                        ;;
-                    max)
-                        summary_value="${MAX_SUMMARIES[$i]:-}"
-                        if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
-                            local formatted_num=$(format_with_commas "$summary_value")
-                            summary_value="${formatted_num}m"
-                        elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
-                            local formatted_num=$(format_with_commas "$summary_value")
-                            summary_value="${formatted_num}M"
-                        elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
-                            local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
-                            summary_value=$(printf "%.${decimals}f" "$summary_value")
-                        elif [[ -n "$format" ]]; then
-                            summary_value=$(printf "%s" "$format" | xargs printf "%s" "$summary_value")
-                        fi
-                        ;;
-                    count)
-                        summary_value="${COUNT_SUMMARIES[$i]:-0}"
-                        ;;
-                    unique)
-                        if [[ -n "${UNIQUE_VALUES[$i]}" ]]; then
-                            summary_value=$(echo "${UNIQUE_VALUES[$i]}" | tr ' ' '\n' | sort -u | wc -l)
-                        else
-                            summary_value="0"
-                        fi
-                        ;;
-                    avg)
-                        if [[ -n "${AVG_SUMMARIES[$i]}" && "${AVG_COUNTS[$i]}" -gt 0 ]]; then
-                            local avg_result
-                            if [[ "$datatype" == "float" ]]; then
-                                local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
-                                avg_result=$(awk "BEGIN {printf \"%.${decimals}f\", (${AVG_SUMMARIES[$i]}) / (${AVG_COUNTS[$i]})}")
-                                summary_value=$(printf "%.${decimals}f" "$avg_result")
-                            else
-                                # Use bash arithmetic for division for non-float types
-                                avg_result=$((${AVG_SUMMARIES[$i]} / ${AVG_COUNTS[$i]}))
-                                if [[ "$datatype" == "int" ]]; then
-                                    summary_value=$(printf "%.0f" "$avg_result")
-                                elif [[ "$datatype" == "num" ]]; then
-                                    summary_value=$(format_num "$avg_result" "$format")
-                                else
-                                    summary_value="$avg_result"
-                                fi
-                            fi
-                        else
-                            summary_value="0"
-                        fi
-                        ;;
-                esac
+                local summary_value
+                summary_value=$(format_summary_value "$i" "${SUMMARIES[$i]}" "${DATATYPES[$i]}" "${FORMATS[$i]}")
                 local content_width=$((WIDTHS[i] - (2 * PADDINGS[i])))
                 local summary_value_len; summary_value_len=$(get_display_length "$summary_value")
                 if [[ $summary_value_len -gt $content_width && "${IS_WIDTH_SPECIFIED[i]}" == "true" ]]; then
@@ -1046,7 +888,7 @@ draw_table() {
     if [[ -n "$TABLE_FOOTER" ]]; then
         calculate_footer_width "$TABLE_FOOTER" "$total_table_width"
     fi
-    [[ -n "$TABLE_TITLE" ]] && render_table_title "$total_table_width"
+    [[ -n "$TABLE_TITLE" ]] && render_table_element "title" "$total_table_width"
     render_table_top_border
     render_table_headers
     render_table_separator "middle"
@@ -1054,7 +896,7 @@ draw_table() {
     has_summaries=false
     render_summaries_row && has_summaries=true
     render_table_bottom_border
-    [[ -n "$TABLE_FOOTER" ]] && render_table_footer "$total_table_width"
+    [[ -n "$TABLE_FOOTER" ]] && render_table_element "footer" "$total_table_width"
 }
 tables_main() { draw_table "$@"; }
 tables_render() { local layout_file="$1" data_file="$2"; shift 2; draw_table "$layout_file" "$data_file" "$@"; }

@@ -26,6 +26,7 @@ char *strdup_safe(const char *str) {
 
 /*
  * Calculate display width of text, accounting for ANSI escape codes (which don't take up visible space)
+ * This implementation matches the Bash version's logic exactly
  */
 int get_display_width(const char *text) {
     if (text == NULL || strlen(text) == 0) return 0;
@@ -49,53 +50,83 @@ int get_display_width(const char *text) {
     }
     clean_text[j] = '\0';
 
-    // Now, calculate width of the cleaned string using wcswidth
-    size_t num_wchars = mbstowcs(NULL, clean_text, 0);
-    if (num_wchars == (size_t)-1) {
-        int len = strlen(clean_text);
-        free(clean_text);
-        return len; // Fallback for invalid multibyte string
-    }
-
-    wchar_t *wc_str = malloc((num_wchars + 1) * sizeof(wchar_t));
-    if (!wc_str) {
-        int len = strlen(clean_text);
-        free(clean_text);
-        return len; // Fallback
-    }
-
-    mbstowcs(wc_str, clean_text, num_wchars + 1);
-    
-    // Calculate width character by character to handle emojis and special chars
-    int total_width = 0;
-    for (size_t i = 0; i < num_wchars; i++) {
-        int char_width = wcwidth(wc_str[i]);
-        if (char_width == -1) {
-            // For unprintable or zero-width characters, treat as 0 width
-            char_width = 0;
-        } else if (char_width == 0) {
-            // Combining characters, zero width
-            char_width = 0;
-        } else if (wc_str[i] >= 0x1F600 && wc_str[i] <= 0x1F64F) {
-            // Emoticons range - force to 2 width
-            char_width = 2;
-        } else if (wc_str[i] >= 0x1F300 && wc_str[i] <= 0x1F5FF) {
-            // Miscellaneous symbols and pictographs - force to 2 width
-            char_width = 2;
-        } else if (wc_str[i] >= 0x1F680 && wc_str[i] <= 0x1F6FF) {
-            // Transport and map symbols - force to 2 width
-            char_width = 2;
-        } else if (wc_str[i] >= 0x2600 && wc_str[i] <= 0x26FF) {
-            // Miscellaneous symbols (including checkmarks) - usually 1 width
-            char_width = 1;
+    // Check if it's pure ASCII first (optimization from Bash version)
+    int is_ascii = 1;
+    for (int i = 0; clean_text[i]; i++) {
+        if ((unsigned char)clean_text[i] > 127) {
+            is_ascii = 0;
+            break;
         }
-        total_width += char_width;
+    }
+    
+    if (is_ascii) {
+        int len = strlen(clean_text);
+        free(clean_text);
+        return len;
     }
 
-    free(wc_str);
-    free(clean_text);
+    // Manual UTF-8 parsing to match Bash version exactly
+    int width = 0;
+    int len = strlen(clean_text);
+    int i = 0;
+    
+    while (i < len) {
+        unsigned char byte1 = (unsigned char)clean_text[i];
+        
+        if (byte1 < 128) {
+            // ASCII character
+            width++;
+            i++;
+        } else if (byte1 < 224) {
+            // 2-byte UTF-8 sequence
+            if (i + 1 < len) {
+                unsigned char byte2 = (unsigned char)clean_text[i + 1];
+                int codepoint = ((byte1 & 0x1F) << 6) | (byte2 & 0x3F);
+                
+                // CJK range from Bash version: 4352-55215 → width 2
+                if (codepoint >= 4352 && codepoint <= 55215) {
+                    width += 2;
+                } else {
+                    width++;
+                }
+                i += 2;
+            } else {
+                width++;
+                i++;
+            }
+        } else if (byte1 < 240) {
+            // 3-byte UTF-8 sequence
+            if (i + 2 < len) {
+                unsigned char byte2 = (unsigned char)clean_text[i + 1];
+                unsigned char byte3 = (unsigned char)clean_text[i + 2];
+                int codepoint = ((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F);
+                
+                // Emoji ranges from Bash version: 127744-129535 and 9728-10175 → width 2
+                if ((codepoint >= 127744 && codepoint <= 129535) ||
+                    (codepoint >= 9728 && codepoint <= 10175)) {
+                    width += 2;
+                } else {
+                    width++;
+                }
+                i += 3;
+            } else {
+                width++;
+                i++;
+            }
+        } else {
+            // 4-byte UTF-8 sequence - assume width 2 like Bash version
+            if (i + 3 < len) {
+                width += 2;
+                i += 4;
+            } else {
+                width++;
+                i++;
+            }
+        }
+    }
 
-    return total_width;
+    free(clean_text);
+    return width;
 }
 
 /*

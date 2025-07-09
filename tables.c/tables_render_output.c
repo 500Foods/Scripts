@@ -59,11 +59,28 @@ void render_table(TableConfig *config, TableData *data) {
     
     // Check if title is present for rendering
     int title_present = (config->title && strlen(config->title) > 0);
-    int title_width = title_present ? get_display_width(config->title) : 0;
-    int box_width = title_width + 4; // Add padding for box borders and internal padding
+    int title_width = 0;
+    int box_width = 0;
     int title_padding = 0;
 
     if (title_present) {
+        // Process the title the same way as in render_title() to get accurate width
+        char *evaluated_title = evaluate_dynamic_string(config->title);
+        if (evaluated_title == NULL) {
+            evaluated_title = strdup(config->title ? config->title : "");
+        }
+        
+        char *processed_title = replace_color_placeholders(evaluated_title);
+        if (processed_title == NULL) {
+            processed_title = strdup(evaluated_title);
+        }
+        free(evaluated_title);
+        
+        title_width = get_display_width(processed_title);
+        box_width = title_width + 4; // Add padding for box borders and internal padding
+        
+        free(processed_title);
+        
         if (config->title_pos == POSITION_CENTER) {
             title_padding = (total_width - box_width) / 2;
         } else if (config->title_pos == POSITION_RIGHT) {

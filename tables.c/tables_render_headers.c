@@ -54,7 +54,7 @@ void render_headers(TableConfig *config) {
                 padding_right += remaining_padding;
             }
         }
-        printf("%s%*s%s%*s", config->theme.header_color, padding_left, "", display_header, padding_right, "");
+        printf("%s%*s%s%*s", config->theme.caption_color, padding_left, "", display_header, padding_right, "");
         if (display_header != header) {
             free(display_header);
         }
