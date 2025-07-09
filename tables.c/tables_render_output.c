@@ -62,30 +62,25 @@ void render_table(TableConfig *config, TableData *data) {
     int title_width = title_present ? get_display_width(config->title) : 0;
     int box_width = title_width + 4; // Add padding for box borders and internal padding
     int title_padding = 0;
-    int title_right_edge = 0;
 
     if (title_present) {
         if (config->title_pos == POSITION_CENTER) {
             title_padding = (total_width - box_width) / 2;
-            title_right_edge = title_padding + box_width - 1;
         } else if (config->title_pos == POSITION_RIGHT) {
             title_padding = total_width - box_width;
-            title_right_edge = total_width - 1;
         } else if (config->title_pos == POSITION_FULL) {
             box_width = total_width;
             title_padding = 0;
-            title_right_edge = total_width - 1;
         } else { // POSITION_LEFT or default
             title_padding = 0;
-            title_right_edge = box_width - 1;
         }
     }
 
     // Render title if present
     render_title(config, total_width);
 
-    // Render top border integrating with title if present
-    render_top_border_with_title(config, total_width, title_present, title_padding, title_right_edge, box_width);
+    // Render top border (integrating with title if present)
+    render_top_border_with_title(config, total_width, title_present, title_padding, box_width);
 
     // Render headers for visible columns
     render_headers(config);

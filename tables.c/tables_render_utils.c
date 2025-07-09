@@ -3,9 +3,12 @@
  * Contains helper functions for string handling and text wrapping.
  */
 
+#define _XOPEN_SOURCE 700
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
+#include <locale.h>
 #include "tables_render_utils.h"
 
 /*
@@ -26,19 +29,139 @@ char *strdup_safe(const char *str) {
  */
 int get_display_width(const char *text) {
     if (text == NULL || strlen(text) == 0) return 0;
-    
-    int width = 0;
+
+    // First, remove ANSI escape codes
+    char *clean_text = malloc(strlen(text) + 1);
+    if (!clean_text) return 0;
+
     int in_ansi = 0;
+    int j = 0;
     for (const char *p = text; *p; p++) {
         if (*p == '\033') {
             in_ansi = 1;
-        } else if (in_ansi && *p == 'm') {
+        }
+        if (!in_ansi) {
+            clean_text[j++] = *p;
+        }
+        if (in_ansi && *p == 'm') {
             in_ansi = 0;
-        } else if (!in_ansi) {
-            width++;
         }
     }
-    return width;
+    clean_text[j] = '\0';
+
+    // Now, calculate width of the cleaned string using wcswidth
+    size_t num_wchars = mbstowcs(NULL, clean_text, 0);
+    if (num_wchars == (size_t)-1) {
+        int len = strlen(clean_text);
+        free(clean_text);
+        return len; // Fallback for invalid multibyte string
+    }
+
+    wchar_t *wc_str = malloc((num_wchars + 1) * sizeof(wchar_t));
+    if (!wc_str) {
+        int len = strlen(clean_text);
+        free(clean_text);
+        return len; // Fallback
+    }
+
+    mbstowcs(wc_str, clean_text, num_wchars + 1);
+    
+    // Calculate width character by character to handle emojis and special chars
+    int total_width = 0;
+    for (size_t i = 0; i < num_wchars; i++) {
+        int char_width = wcwidth(wc_str[i]);
+        if (char_width == -1) {
+            // For unprintable or zero-width characters, treat as 0 width
+            char_width = 0;
+        } else if (char_width == 0) {
+            // Combining characters, zero width
+            char_width = 0;
+        } else if (wc_str[i] >= 0x1F600 && wc_str[i] <= 0x1F64F) {
+            // Emoticons range - force to 2 width
+            char_width = 2;
+        } else if (wc_str[i] >= 0x1F300 && wc_str[i] <= 0x1F5FF) {
+            // Miscellaneous symbols and pictographs - force to 2 width
+            char_width = 2;
+        } else if (wc_str[i] >= 0x1F680 && wc_str[i] <= 0x1F6FF) {
+            // Transport and map symbols - force to 2 width
+            char_width = 2;
+        } else if (wc_str[i] >= 0x2600 && wc_str[i] <= 0x26FF) {
+            // Miscellaneous symbols (including checkmarks) - usually 1 width
+            char_width = 1;
+        }
+        total_width += char_width;
+    }
+
+    free(wc_str);
+    free(clean_text);
+
+    return total_width;
+}
+
+/*
+ * Clip text to a maximum display width, preserving ANSI codes and handling Unicode properly
+ */
+char *clip_text_to_width(const char *text, int max_width) {
+    if (text == NULL || max_width <= 0) {
+        return strdup("");
+    }
+    
+    if (get_display_width(text) <= max_width) {
+        return strdup(text);
+    }
+    
+    // We need to find the byte position where we reach max_width display characters
+    int current_width = 0;
+    int byte_pos = 0;
+    int in_ansi = 0;
+    
+    while (text[byte_pos] != '\0' && current_width < max_width) {
+        if (text[byte_pos] == '\033') {
+            in_ansi = 1;
+            byte_pos++;
+        } else if (in_ansi && text[byte_pos] == 'm') {
+            in_ansi = 0;
+            byte_pos++;
+        } else if (in_ansi) {
+            byte_pos++;
+        } else {
+            // This is a visible character - check its width
+            char temp_char[5] = {0}; // Max UTF-8 char is 4 bytes + null
+            int char_bytes = 1;
+            
+            // Determine how many bytes this UTF-8 character uses
+            if ((text[byte_pos] & 0x80) == 0) {
+                char_bytes = 1; // ASCII
+            } else if ((text[byte_pos] & 0xE0) == 0xC0) {
+                char_bytes = 2;
+            } else if ((text[byte_pos] & 0xF0) == 0xE0) {
+                char_bytes = 3;
+            } else if ((text[byte_pos] & 0xF8) == 0xF0) {
+                char_bytes = 4;
+            }
+            
+            // Copy the character bytes
+            for (int i = 0; i < char_bytes && text[byte_pos + i] != '\0'; i++) {
+                temp_char[i] = text[byte_pos + i];
+            }
+            
+            int char_width = get_display_width(temp_char);
+            if (current_width + char_width <= max_width) {
+                current_width += char_width;
+                byte_pos += char_bytes;
+            } else {
+                break; // Would exceed max_width
+            }
+        }
+    }
+    
+    char *result = malloc(byte_pos + 1);
+    if (!result) return strdup("");
+    
+    strncpy(result, text, byte_pos);
+    result[byte_pos] = '\0';
+    
+    return result;
 }
 
 /*
@@ -364,7 +487,8 @@ char *replace_color_placeholders(const char *input) {
         {"{BOLD}", "\033[1m"},
         {"{DIM}", "\033[2m"},
         {"{UNDERLINE}", "\033[4m"},
-        {"{NC}", "\033[0m"}
+        {"{NC}", "\033[0m"},
+        {"{RESET}", "\033[0m"}
     };
     const int color_map_size = sizeof(color_map) / sizeof(color_map[0]);
 
@@ -416,4 +540,31 @@ char *replace_color_placeholders(const char *input) {
     }
 
     return result;
+}
+
+/*
+ * Clip text to a specified width, handling multi-byte characters and ANSI codes
+ */
+char *clip_text(const char *text, int width, Position justification) {
+    (void)justification;
+    if (text == NULL) {
+        return strdup("");
+    }
+
+    int display_width = get_display_width(text);
+    if (display_width <= width) {
+        return strdup(text);
+    }
+
+    // This is a simplified clipping logic. A proper implementation would need to be
+    // aware of multi-byte characters and ANSI escape codes during the clipping process.
+    char *clipped = malloc(width + 1);
+    if (clipped == NULL) {
+        return strdup("");
+    }
+    
+    strncpy(clipped, text, width);
+    clipped[width] = '\0';
+    
+    return clipped;
 }

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jansson.h>
+#include <locale.h>
 #include "tables_config.h"
 #include "tables_themes.h"
 #include "tables_data.h"
@@ -26,6 +27,7 @@ int debug_mode = 0;
 int debug_layout = 0;
 
 int main(int argc, char *argv[]) {
+    setlocale(LC_ALL, "");
     if (argc < 3) {
         fprintf(stderr, "Error: Both layout and data JSON files are required\n");
         print_help();

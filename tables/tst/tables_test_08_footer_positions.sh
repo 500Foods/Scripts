@@ -521,7 +521,85 @@ echo -e "\nTest 8-L: Right - Footer greater than table width"
 echo "------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
 
-# Test 8-M: Right - Dynamic footer with date calculations (wide table)
+# Test 8-M: Full - Footer with color
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "footer": "{RED}Summary Report{RESET}",
+  "footer_position": "full",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 8-M: Full - Footer with color"
+echo "----------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+
+# Test 8-N: Full - Footer greater than table width
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "footer": "Detailed Summary Performance and Configuration Analysis Report for Q2 2023 which is a very long footer text to test clipping behavior in full position",
+  "footer_position": "full",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 8-N: Full - Footer greater than table width"
+echo "-----------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+
+# Test 8-O: Right - Dynamic footer with date calculations (wide table)
 cat > "$data_file" << 'EOF'
 [
   {
@@ -606,11 +684,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 8-M: Right - Dynamic footer with date calculations (wide table)"
+echo -e "\nTest 8-O: Right - Dynamic footer with date calculations (wide table)"
 echo "------------------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
 
-# Test 8-N: Dynamic title and footer with date calculations (testing both elements)
+# Test 8-P: Dynamic title and footer with date calculations (testing both elements)
 cat > "$data_file" << 'EOF'
 [
   {
@@ -688,11 +766,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 8-N: Dynamic title and footer with date calculations (testing both elements)"
+echo -e "\nTest 8-P: Dynamic title and footer with date calculations (testing both elements)"
 echo "------------------------------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
 
-# Test 8-O: Unicode double-width characters (emojis and checkmarks)
+# Test 8-Q: Unicode double-width characters (emojis and checkmarks)
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
@@ -747,6 +825,6 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 8-O: Unicode double-width characters (emojis and checkmarks)"
+echo -e "\nTest 8-Q: Unicode double-width characters (emojis and checkmarks)"
 echo "----------------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG

@@ -15,6 +15,6 @@ void render_title(TableConfig *config, int total_width);
 /*
  * Render the top border of the table, integrating with title's bottom border if present
  */
-void render_top_border_with_title(TableConfig *config, int total_width, int title_present, int title_padding, int title_right_edge, int box_width);
+void render_top_border_with_title(TableConfig *config, int total_width, int title_present, int title_padding, int box_width);
 
 #endif /* TABLES_RENDER_TITLE_H */
