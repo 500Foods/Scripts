@@ -6,9 +6,10 @@
 
 echo "Starting execution of table test scripts..."
 
-# Find all tables_test*.sh scripts and sort them by the numerical part of the filename
+# Find all tables_test*.sh scripts in the script's own directory and sort them
+# by the numerical part of the filename.
 # Use a while loop to handle filenames with spaces or special characters
-find . -type f -name "tables_test*[0-9]*.sh" | sort -t '_' -k 3n | while read -r test_script; do
+find "$(dirname "$0")" -maxdepth 1 -type f -name "tables_test*[0-9]*.sh" | sort -t '_' -k 3n | while read -r test_script; do
     if [[ -x "$test_script" ]]; then
         echo "Running $test_script..."
         "$test_script"
