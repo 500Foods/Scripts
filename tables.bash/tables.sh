@@ -45,7 +45,7 @@ get_display_length() {
             if [[ $((i + 6)) -le $len ]]; then
                 local byte2_hex="${codepoints:$((i+2)):2}" byte3_hex="${codepoints:$((i+4)):2}"
                 local codepoint=$(( (byte1 & 0x0F) << 12 | (0x$byte2_hex & 0x3F) << 6 | (0x$byte3_hex & 0x3F) ))
-                if [[ $codepoint -ge 127744 && $codepoint -le 129535 ]] || [[ $codepoint -ge 9728 && $codepoint -le 10175 ]]; then ((width += 2)); else ((width++)); fi
+                if [[ $codepoint -ge 127744 && $codepoint -le 129535 ]] || [[ $codepoint -ge 9728 && $codepoint -le 9983 ]]; then ((width += 2)); else ((width++)); fi
                 ((i += 6))
             else ((width++)); ((i += 2)); fi
         else

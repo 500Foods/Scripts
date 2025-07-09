@@ -73,7 +73,7 @@ void render_rows(TableConfig *config, TableData *data) {
             if (!config->columns[j].visible) continue;
             ColumnConfig *col = &config->columns[j];
             char *raw_value = row->values[j];
-            char *formatted = format_display_value(raw_value, col->null_val, col->zero_val, col->data_type, col->format, col->string_limit, col->wrap_mode, col->wrap_char, col->justify);
+            char *formatted = format_display_value_with_precision(raw_value, col->null_val, col->zero_val, col->data_type, col->format, col->string_limit, col->wrap_mode, col->wrap_char, col->justify, data->summaries[j].max_decimal_places);
             if (col->width_specified && col->wrap_mode == WRAP_CLIP) {
                 // Truncate if width is specified and wrapping is disabled
                 int display_width = get_display_width(formatted);

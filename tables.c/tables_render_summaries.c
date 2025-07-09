@@ -45,81 +45,102 @@ void render_summaries(TableConfig *config, TableData *data) {
         char summary_text[256] = {0};
         switch (col->summary) {
             case SUMMARY_SUM:
-                if (col->data_type == DATA_KCPU) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_KMEM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_FLOAT) {
-                    char format[16];
-                    snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
-                    snprintf(summary_text, sizeof(summary_text), format, stats->sum);
-                } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
+                // Only show summary if sum is not zero
+                if (stats->sum != 0.0) {
+                    if (col->data_type == DATA_KCPU) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_KMEM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_FLOAT) {
+                        char format[16];
+                        snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
+                        snprintf(summary_text, sizeof(summary_text), format, stats->sum);
+                    } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
+                    } else {
+                        snprintf(summary_text, sizeof(summary_text), "%.2f", stats->sum);
+                    }
                 } else {
-                    snprintf(summary_text, sizeof(summary_text), "%.2f", stats->sum);
+                    summary_text[0] = '\0'; // Empty string for zero sum
                 }
                 break;
             case SUMMARY_MIN:
-                if (col->data_type == DATA_KCPU) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_KMEM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_FLOAT) {
-                    char format[16];
-                    snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
-                    snprintf(summary_text, sizeof(summary_text), format, stats->min);
-                } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
+                // Only show summary if min has been set (stats->count > 0)
+                if (stats->count > 0) {
+                    if (col->data_type == DATA_KCPU) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_KMEM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_FLOAT) {
+                        char format[16];
+                        snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
+                        snprintf(summary_text, sizeof(summary_text), format, stats->min);
+                    } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
+                    } else {
+                        snprintf(summary_text, sizeof(summary_text), "%.2f", stats->min);
+                    }
                 } else {
-                    snprintf(summary_text, sizeof(summary_text), "%.2f", stats->min);
+                    summary_text[0] = '\0'; // Empty string if no data
                 }
                 break;
             case SUMMARY_MAX:
-                if (col->data_type == DATA_KCPU) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_KMEM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
-                    char *formatted = format_with_commas(summary_text);
-                    snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
-                    free(formatted);
-                } else if (col->data_type == DATA_FLOAT) {
-                    char format[16];
-                    snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
-                    snprintf(summary_text, sizeof(summary_text), format, stats->max);
-                } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
-                    snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
+                // Only show summary if max has been set (stats->count > 0)
+                if (stats->count > 0) {
+                    if (col->data_type == DATA_KCPU) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sm", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_KMEM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
+                        char *formatted = format_with_commas(summary_text);
+                        snprintf(summary_text, sizeof(summary_text), "%sM", formatted);
+                        free(formatted);
+                    } else if (col->data_type == DATA_FLOAT) {
+                        char format[16];
+                        snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
+                        snprintf(summary_text, sizeof(summary_text), format, stats->max);
+                    } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
+                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
+                    } else {
+                        snprintf(summary_text, sizeof(summary_text), "%.2f", stats->max);
+                    }
                 } else {
-                    snprintf(summary_text, sizeof(summary_text), "%.2f", stats->max);
+                    summary_text[0] = '\0'; // Empty string if no data
                 }
                 break;
             case SUMMARY_AVG:
                 if (stats->avg_count > 0) {
-                    if (col->data_type == DATA_FLOAT) {
-                        char format[16];
-                        snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
-                        snprintf(summary_text, sizeof(summary_text), format, stats->avg_sum / stats->avg_count);
-                    } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
-                        snprintf(summary_text, sizeof(summary_text), "%.0f", stats->avg_sum / stats->avg_count);
+                    double avg_result = stats->avg_sum / stats->avg_count;
+                    // Only show if average is not zero
+                    if (avg_result != 0.0) {
+                        if (col->data_type == DATA_FLOAT) {
+                            char format[16];
+                            snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
+                            snprintf(summary_text, sizeof(summary_text), format, avg_result);
+                        } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
+                            snprintf(summary_text, sizeof(summary_text), "%.0f", avg_result);
+                        } else {
+                            snprintf(summary_text, sizeof(summary_text), "%.2f", avg_result);
+                        }
                     } else {
-                        snprintf(summary_text, sizeof(summary_text), "%.2f", stats->avg_sum / stats->avg_count);
+                        summary_text[0] = '\0'; // Empty string for zero average
                     }
                 } else {
-                    snprintf(summary_text, sizeof(summary_text), "N/A");
+                    summary_text[0] = '\0'; // Empty string if no data
                 }
                 break;
             case SUMMARY_COUNT:

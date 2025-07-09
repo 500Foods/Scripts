@@ -101,9 +101,10 @@ int get_display_width(const char *text) {
                 unsigned char byte3 = (unsigned char)clean_text[i + 2];
                 int codepoint = ((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F);
                 
-                // Emoji ranges from Bash version: 127744-129535 and 9728-10175 → width 2
+                // More precise emoji ranges - exclude single-width symbols like checkmarks
+                // Emoji ranges: 127744-129535 (main emoji block) and 9728-9983 (dingbats, excluding checkmarks)
                 if ((codepoint >= 127744 && codepoint <= 129535) ||
-                    (codepoint >= 9728 && codepoint <= 10175)) {
+                    (codepoint >= 9728 && codepoint <= 9983)) {
                     width += 2;
                 } else {
                     width++;

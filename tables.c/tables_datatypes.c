@@ -475,3 +475,49 @@ char *format_display_value(const char *value, ValueDisplay null_value, ValueDisp
     
     return display_value;
 }
+
+/*
+ * Format a value for display with decimal precision, considering null and zero value display options
+ */
+char *format_display_value_with_precision(const char *value, ValueDisplay null_value, ValueDisplay zero_value, DataType data_type, const char *format, int string_limit, int wrap_mode, const char *wrap_char, int justification, int max_decimal_places) {
+    DataTypeHandler *handler = get_data_type_handler(data_type);
+    int is_valid = handler->validate(value);
+    char *display_value = NULL;
+    
+    if (!is_valid || value == NULL || strcmp(value, "null") == 0) {
+        switch (null_value) {
+            case VALUE_ZERO:
+                display_value = strdup("0");
+                break;
+            case VALUE_MISSING:
+                display_value = strdup("Missing");
+                break;
+            default:
+                display_value = strdup("");
+        }
+    } else if (strcmp(value, "0") == 0 || strcmp(value, "0m") == 0 || strcmp(value, "0M") == 0 || strcmp(value, "0G") == 0 || strcmp(value, "0K") == 0) {
+        switch (zero_value) {
+            case VALUE_ZERO:
+                display_value = strdup("0");
+                break;
+            case VALUE_MISSING:
+                display_value = strdup("Missing");
+                break;
+            default:
+                display_value = strdup("");
+        }
+    } else {
+        // For float data type, format with consistent decimal places
+        if (data_type == DATA_FLOAT && max_decimal_places > 0) {
+            char format_str[16];
+            snprintf(format_str, sizeof(format_str), "%%.%df", max_decimal_places);
+            char buffer[256];
+            snprintf(buffer, sizeof(buffer), format_str, atof(value));
+            display_value = strdup(buffer);
+        } else {
+            display_value = handler->format(value, format, string_limit, wrap_mode, wrap_char, justification);
+        }
+    }
+    
+    return display_value;
+}

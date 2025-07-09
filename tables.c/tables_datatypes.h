@@ -28,6 +28,7 @@ int validate_kmem(const char *value);
 char *format_kmem(const char *value, const char *format, int string_limit, int wrap_mode, const char *wrap_char, int justification);
 DataTypeHandler *get_data_type_handler(DataType type);
 char *format_display_value(const char *value, ValueDisplay null_value, ValueDisplay zero_value, DataType data_type, const char *format, int string_limit, int wrap_mode, const char *wrap_char, int justification);
+char *format_display_value_with_precision(const char *value, ValueDisplay null_value, ValueDisplay zero_value, DataType data_type, const char *format, int string_limit, int wrap_mode, const char *wrap_char, int justification, int max_decimal_places);
 char *format_with_commas(const char *num_str);
 
 #endif /* TABLES_DATATYPES_H */

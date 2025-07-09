@@ -93,8 +93,10 @@ void render_title(TableConfig *config, int total_width) {
     int right_padding = 1;
 
     if (config->title_pos == POSITION_FULL) {
-        left_padding = (box_width - text_width) / 2;
-        right_padding = box_width - text_width - left_padding;
+        // For full position, center the text within the available width (excluding borders)
+        int spaces = (available_width - text_width) / 2;
+        left_padding = spaces;  // Just the calculated spaces, no additional padding
+        right_padding = available_width - text_width - spaces;  // Remaining space
     }
 
     printf("%*s%s%s%*s", left_padding, "", config->theme.header_color, clipped_text, right_padding, "");
@@ -151,7 +153,7 @@ void render_top_border_with_title(TableConfig *config, int total_width, int titl
                 printf("%s", (title_end >= total_width - 1) ? config->theme.r_junct : config->theme.tr_corner);
             } else if (i == title_start) {
                 printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
-            } else if (i == title_end) {
+            } else if (i == title_end && title_end < total_width - 1) {
                 printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
             } else if (i > title_start && i < title_end) {
                 printf("%s", is_col_junct ? config->theme.t_junct : config->theme.h_line);
