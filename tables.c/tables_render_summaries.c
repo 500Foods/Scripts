@@ -61,10 +61,22 @@ void render_summaries(TableConfig *config, TableData *data) {
                         char format[16];
                         snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
                         snprintf(summary_text, sizeof(summary_text), format, stats->sum);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
                         snprintf(summary_text, sizeof(summary_text), "%.0f", stats->sum);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else {
                         snprintf(summary_text, sizeof(summary_text), "%.2f", stats->sum);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     }
                 } else {
                     summary_text[0] = '\0'; // Empty string for zero sum
@@ -87,10 +99,22 @@ void render_summaries(TableConfig *config, TableData *data) {
                         char format[16];
                         snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
                         snprintf(summary_text, sizeof(summary_text), format, stats->min);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
                         snprintf(summary_text, sizeof(summary_text), "%.0f", stats->min);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else {
                         snprintf(summary_text, sizeof(summary_text), "%.2f", stats->min);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     }
                 } else {
                     summary_text[0] = '\0'; // Empty string if no data
@@ -113,10 +137,22 @@ void render_summaries(TableConfig *config, TableData *data) {
                         char format[16];
                         snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
                         snprintf(summary_text, sizeof(summary_text), format, stats->max);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
                         snprintf(summary_text, sizeof(summary_text), "%.0f", stats->max);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     } else {
                         snprintf(summary_text, sizeof(summary_text), "%.2f", stats->max);
+                        char *formatted = format_with_commas(summary_text);
+                        strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                        summary_text[sizeof(summary_text) - 1] = '\0';
+                        free(formatted);
                     }
                 } else {
                     summary_text[0] = '\0'; // Empty string if no data
@@ -131,10 +167,22 @@ void render_summaries(TableConfig *config, TableData *data) {
                             char format[16];
                             snprintf(format, sizeof(format), "%%.%df", stats->max_decimal_places);
                             snprintf(summary_text, sizeof(summary_text), format, avg_result);
+                            char *formatted = format_with_commas(summary_text);
+                            strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                            summary_text[sizeof(summary_text) - 1] = '\0';
+                            free(formatted);
                         } else if (col->data_type == DATA_INT || col->data_type == DATA_NUM) {
                             snprintf(summary_text, sizeof(summary_text), "%.0f", avg_result);
+                            char *formatted = format_with_commas(summary_text);
+                            strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                            summary_text[sizeof(summary_text) - 1] = '\0';
+                            free(formatted);
                         } else {
                             snprintf(summary_text, sizeof(summary_text), "%.2f", avg_result);
+                            char *formatted = format_with_commas(summary_text);
+                            strncpy(summary_text, formatted, sizeof(summary_text) - 1);
+                            summary_text[sizeof(summary_text) - 1] = '\0';
+                            free(formatted);
                         }
                     } else {
                         summary_text[0] = '\0'; // Empty string for zero average
@@ -154,7 +202,7 @@ void render_summaries(TableConfig *config, TableData *data) {
         }
         char *summary_display = strdup_safe(summary_text);
         int summary_width = get_display_width(summary_display);
-        int effective_width = col->width - 2; // Account for 1 space padding on each side
+        int effective_width = col->width - 1; // Account for minimum padding, let rendering handle the rest
         if (summary_width > effective_width && col->wrap_mode == WRAP_CLIP) {
             char *truncated = malloc(col->width + 1);
             if (truncated) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tables.sh - Library for JSON to ANSI tables
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
-declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_number" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
+declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_float" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
 declare -A THEME
 # Only declare color variables if not already set (prevents readonly variable errors)
 if [[ -z "${RED:-}" ]]; then
@@ -56,11 +56,27 @@ get_display_length() {
 }
 format_with_commas() {
     local num="$1"
-    local result="$num"
-    while [[ $result =~ ^([0-9]+)([0-9]{3}.*) ]]; do
-        result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
-    done
-    echo "$result"
+    
+    # Handle decimal numbers by separating integer and decimal parts
+    if [[ "$num" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
+        local integer_part="${BASH_REMATCH[1]}"
+        local decimal_part="${BASH_REMATCH[2]}"
+        
+        # Add commas to integer part
+        local result="$integer_part"
+        while [[ $result =~ ^([0-9]+)([0-9]{3}.*) ]]; do
+            result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
+        done
+        
+        echo "${result}.${decimal_part}"
+    else
+        # Handle integer numbers
+        local result="$num"
+        while [[ $result =~ ^([0-9]+)([0-9]{3}.*) ]]; do
+            result="${BASH_REMATCH[1]},${BASH_REMATCH[2]}"
+        done
+        echo "$result"
+    fi
 }
 format_text() {
     local value="$1" format="$2" string_limit="$3" wrap_mode="$4" wrap_char="$5" justification="$6"
@@ -81,8 +97,27 @@ format_text() {
     else echo "$value"; fi
 }
 format_numeric() { local value="$1" format="$2" use_commas="$3"; [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }; if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then if [[ -n "$format" ]]; then printf '%s' "$value"; elif [[ "$use_commas" == "true" ]]; then format_with_commas "$value"; else echo "$value"; fi; else echo "$value"; fi; }
-format_number() { format_numeric "$1" "$2" "false"; }
+format_number() { format_numeric "$1" "$2" "true"; }
 format_num() { format_numeric "$1" "$2" "true"; }
+format_float() {
+    local value="$1" format="$2" column_index="$3"
+    [[ -z "$value" || "$value" == "null" || "$value" == "0" ]] && { echo ""; return; }
+    
+    if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        # Use the maximum decimal places for this column if available
+        local max_decimals="${MAX_DECIMAL_PLACES[$column_index]:-2}"
+        
+        # Format with consistent decimal places
+        local formatted_value
+        formatted_value=$(printf "%.${max_decimals}f" "$value")
+        
+        # Apply thousands separators
+        formatted_value=$(format_with_commas "$formatted_value")
+        echo "$formatted_value"
+    else
+        echo "$value"
+    fi
+}
 format_kcpu() {
     local value="$1" format="$2"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
@@ -321,7 +356,11 @@ process_data_rows() {
             if [[ -v "row_data[$key]" ]]; then value="${row_data[$key]}"; fi
             value=$("$validate_fn" "$value")
             local display_value
-            display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
+            if [[ "$datatype" == "float" ]]; then
+                display_value=$("$format_fn" "$value" "$format" "$j")
+            else
+                display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
+            fi
             if [[ "$value" == "null" ]]; then
                 case "${NULL_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
             elif [[ "$value" == "0" || "$value" == "0m" || "$value" == "0M" || "$value" == "0G" || "$value" == "0K" ]]; then
@@ -428,7 +467,86 @@ update_summaries() {
             fi;;
     esac
 }
-format_summary_value() { local j="$1" summary_type="$2" datatype="$3" format="$4" summary_value=""; case "$summary_type" in sum) if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then if [[ "$datatype" == "kcpu" ]]; then summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")m"; elif [[ "$datatype" == "kmem" ]]; then summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")M"; elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format"); elif [[ "$datatype" == "int" || "$datatype" == "float" ]]; then summary_value="${SUM_SUMMARIES[$j]}"; [[ -n "$format" ]] && summary_value=$(printf '%s' "$summary_value"); fi; fi;; min) summary_value="${MIN_SUMMARIES[$j]:-}"; if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")m"; elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")M"; elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then summary_value=$(printf "%.${MAX_DECIMAL_PLACES[$j]:-2}f" "$summary_value"); elif [[ -n "$format" ]]; then summary_value=$(printf '%s' "$summary_value"); fi;; max) summary_value="${MAX_SUMMARIES[$j]:-}"; if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")m"; elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then summary_value="$(format_with_commas "$summary_value")M"; elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then summary_value=$(printf "%.${MAX_DECIMAL_PLACES[$j]:-2}f" "$summary_value"); elif [[ -n "$format" ]]; then summary_value=$(printf '%s' "$summary_value"); fi;; count) summary_value="${COUNT_SUMMARIES[$j]:-0}";; unique) if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then summary_value=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l); else summary_value="0"; fi;; avg) if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then if [[ "$datatype" == "float" ]]; then local decimals=${MAX_DECIMAL_PLACES[$j]:-2}; summary_value=$(awk "BEGIN {printf \"%.${decimals}f\", (${AVG_SUMMARIES[$j]}) / (${AVG_COUNTS[$j]})}"); else local avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]})); if [[ "$datatype" == "int" ]]; then summary_value=$(printf "%.0f" "$avg_result"); elif [[ "$datatype" == "num" ]]; then summary_value=$(format_num "$avg_result" "$format"); else summary_value="$avg_result"; fi; fi; else summary_value="0"; fi;; esac; echo "$summary_value"; }
+format_summary_value() {
+    local j="$1" summary_type="$2" datatype="$3" format="$4" summary_value=""
+    case "$summary_type" in
+        sum)
+            if [[ -n "${SUM_SUMMARIES[$j]}" && "${SUM_SUMMARIES[$j]}" != "0" ]]; then
+                if [[ "$datatype" == "kcpu" ]]; then
+                    summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")m"
+                elif [[ "$datatype" == "kmem" ]]; then
+                    summary_value="$(format_with_commas "${SUM_SUMMARIES[$j]}")M"
+                elif [[ "$datatype" == "num" ]]; then
+                    summary_value=$(format_num "${SUM_SUMMARIES[$j]}" "$format")
+                elif [[ "$datatype" == "int" ]]; then
+                    summary_value=$(format_with_commas "${SUM_SUMMARIES[$j]}")
+                elif [[ "$datatype" == "float" ]]; then
+                    local decimals=${MAX_DECIMAL_PLACES[$j]:-2}
+                    local formatted_sum=$(printf "%.${decimals}f" "${SUM_SUMMARIES[$j]}")
+                    summary_value=$(format_with_commas "$formatted_sum")
+                fi
+            fi
+            ;;
+        min)
+            summary_value="${MIN_SUMMARIES[$j]:-}"
+            if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
+                summary_value="$(format_with_commas "$summary_value")m"
+            elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
+                summary_value="$(format_with_commas "$summary_value")M"
+            elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then
+                local decimals=${MAX_DECIMAL_PLACES[$j]:-2}
+                local formatted_min=$(printf "%.${decimals}f" "$summary_value")
+                summary_value=$(format_with_commas "$formatted_min")
+            elif [[ "$datatype" == "int" && -n "$summary_value" ]]; then
+                summary_value=$(format_with_commas "$summary_value")
+            fi
+            ;;
+        max)
+            summary_value="${MAX_SUMMARIES[$j]:-}"
+            if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
+                summary_value="$(format_with_commas "$summary_value")m"
+            elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
+                summary_value="$(format_with_commas "$summary_value")M"
+            elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$j]}" ]]; then
+                local decimals=${MAX_DECIMAL_PLACES[$j]:-2}
+                local formatted_max=$(printf "%.${decimals}f" "$summary_value")
+                summary_value=$(format_with_commas "$formatted_max")
+            elif [[ "$datatype" == "int" && -n "$summary_value" ]]; then
+                summary_value=$(format_with_commas "$summary_value")
+            fi
+            ;;
+        count)
+            summary_value="${COUNT_SUMMARIES[$j]:-0}"
+            ;;
+        unique)
+            if [[ -n "${UNIQUE_VALUES[$j]}" ]]; then
+                summary_value=$(echo "${UNIQUE_VALUES[$j]}" | tr ' ' '\n' | sort -u | wc -l)
+            else
+                summary_value="0"
+            fi
+            ;;
+        avg)
+            if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
+                if [[ "$datatype" == "float" ]]; then
+                    local decimals=${MAX_DECIMAL_PLACES[$j]:-2}
+                    local avg_result=$(awk "BEGIN {printf \"%.${decimals}f\", (${AVG_SUMMARIES[$j]}) / (${AVG_COUNTS[$j]})}")
+                    summary_value=$(format_with_commas "$avg_result")
+                elif [[ "$datatype" == "int" ]]; then
+                    local avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))
+                    summary_value=$(format_with_commas "$avg_result")
+                elif [[ "$datatype" == "num" ]]; then
+                    local avg_result=$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))
+                    summary_value=$(format_num "$avg_result" "$format")
+                else
+                    summary_value="$((${AVG_SUMMARIES[$j]} / ${AVG_COUNTS[$j]}))"
+                fi
+            else
+                summary_value="0"
+            fi
+            ;;
+    esac
+    echo "$summary_value"
+}
 calculate_element_width() { local text="$1" total_table_width="$2" position="$3" width_var="$4"; if [[ -n "$text" ]]; then local evaluated_text; evaluated_text=$(eval "echo \"$text\"" 2>/dev/null); evaluated_text=$(replace_color_placeholders "$evaluated_text"); evaluated_text=$(printf '%b' "$evaluated_text"); local text_length; text_length=$(get_display_length "$evaluated_text"); if [[ "$position" == "none" ]]; then declare -g "$width_var"=$((text_length + (2 * DEFAULT_PADDING))); elif [[ "$position" == "full" ]]; then declare -g "$width_var"=$total_table_width; else declare -g "$width_var"=$((text_length + (2 * DEFAULT_PADDING))); [[ ${!width_var} -gt $total_table_width ]] && declare -g "$width_var"=$total_table_width; fi; else declare -g "$width_var"=0; fi; }
 calculate_title_width() { calculate_element_width "$1" "$2" "$TITLE_POSITION" "TITLE_WIDTH"; }
 calculate_footer_width() { calculate_element_width "$1" "$2" "$FOOTER_POSITION" "FOOTER_WIDTH"; }
@@ -713,7 +831,21 @@ render_data_rows() {
             local key="${KEYS[$j]}" value
             value="${row_data[$key]}"
             local display_value
-            display_value=$(format_display_value "$value" "${NULL_VALUES[j]}" "${ZERO_VALUES[j]}" "${DATATYPES[j]}" "${FORMATS[j]}" "${STRING_LIMITS[j]}" "${WRAP_MODES[j]}" "${WRAP_CHARS[j]}")
+            if [[ "${DATATYPES[j]}" == "float" ]]; then
+                # For float datatype, use the special formatting function
+                local validate_fn="${DATATYPE_HANDLERS[${DATATYPES[j]}_validate]}"
+                local validated_value
+                validated_value=$("$validate_fn" "$value")
+                if [[ "$validated_value" == "null" ]]; then
+                    case "${NULL_VALUES[j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+                elif [[ "$validated_value" == "0" ]]; then
+                    case "${ZERO_VALUES[j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+                else
+                    display_value=$(format_float "$validated_value" "${FORMATS[j]}" "$j")
+                fi
+            else
+                display_value=$(format_display_value "$value" "${NULL_VALUES[j]}" "${ZERO_VALUES[j]}" "${DATATYPES[j]}" "${FORMATS[j]}" "${STRING_LIMITS[j]}" "${WRAP_MODES[j]}" "${WRAP_CHARS[j]}")
+            fi
             if [[ -n "${WRAP_CHARS[$j]}" && "${WRAP_MODES[$j]}" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
                 local IFS="${WRAP_CHARS[$j]}"
                 read -ra parts <<<"$display_value"

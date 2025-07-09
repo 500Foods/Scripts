@@ -79,18 +79,32 @@ void render_table(TableConfig *config, TableData *data) {
         title_width = get_display_width(processed_title);
         box_width = title_width + 4; // Add padding for box borders and internal padding
         
-        free(processed_title);
-        
-        if (config->title_pos == POSITION_CENTER) {
-            title_padding = (total_width - box_width) / 2;
-        } else if (config->title_pos == POSITION_RIGHT) {
-            title_padding = total_width - box_width;
-        } else if (config->title_pos == POSITION_FULL) {
+        // Apply the same clipping logic as in render_title()
+        if (config->title_pos == POSITION_FULL) {
             box_width = total_width;
             title_padding = 0;
-        } else { // POSITION_LEFT or default
+        } else if (config->title_pos == POSITION_NONE) {
+            // No clipping for POSITION_NONE
             title_padding = 0;
+        } else {
+            // For positioned titles (left, center, right), if the title is longer than table width,
+            // clip it to fit within the table width
+            if (title_width + 4 > total_width) {
+                box_width = total_width;
+                title_padding = 0; // When clipped to table width, no padding
+            } else {
+                // Normal positioning when title fits
+                if (config->title_pos == POSITION_CENTER) {
+                    title_padding = (total_width - box_width) / 2;
+                } else if (config->title_pos == POSITION_RIGHT) {
+                    title_padding = total_width - box_width;
+                } else { // POSITION_LEFT
+                    title_padding = 0;
+                }
+            }
         }
+        
+        free(processed_title);
     }
 
     // Render title if present

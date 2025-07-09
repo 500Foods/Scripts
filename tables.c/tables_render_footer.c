@@ -149,7 +149,7 @@ void render_footer(TableConfig *config, int total_width) {
     }
 
     if (box_width > total_width && config->footer_pos != POSITION_NONE) {
-        char *clipped_footer = clip_text_to_width(display_footer, max_footer_width);
+        char *clipped_footer = clip_text(display_footer, max_footer_width, config->footer_pos);
         if (clipped_footer) {
             if (display_footer != processed_footer) {
                 free(display_footer);
@@ -198,9 +198,17 @@ void render_footer(TableConfig *config, int total_width) {
 
     if (config->footer_pos == POSITION_FULL) {
         // For full position, center the text within the available width (excluding borders)
-        int spaces = (available_width - text_width) / 2;
-        left_padding = spaces;  // Just the calculated spaces, no additional padding
-        right_padding = available_width - text_width - spaces;  // Remaining space
+        // Ensure at least 1 space padding on each side
+        int effective_text_width = available_width - 2; // Reserve space for padding
+        if (text_width > effective_text_width) {
+            // Need to re-clip the text to leave room for padding
+            free(clipped_text);
+            clipped_text = clip_text_to_width(display_footer, effective_text_width);
+            text_width = get_display_width(clipped_text);
+        }
+        int spaces = (available_width - text_width - 2) / 2; // -2 for minimum padding
+        left_padding = 1 + spaces;  // At least 1 space + centering
+        right_padding = available_width - text_width - left_padding;
     }
 
     printf("%*s%s%s%*s", left_padding, "", config->theme.footer_color, clipped_text, right_padding, "");

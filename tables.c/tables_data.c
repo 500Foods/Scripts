@@ -266,176 +266,144 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
         }
     }
     
-    switch (summary_type) {
-        case SUMMARY_SUM:
-            if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
-                char *num_part = strdup(value);
-                if (num_part == NULL) {
-                    fprintf(stderr, "Error: Memory allocation failed for num_part\n");
-                    break;
-                }
-                num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
-                stats->sum += atof(num_part);
-                free(num_part);
-            } else if (data_type == DATA_KMEM) {
-                // TODO: Handle different memory units
-                if (strstr(value, "M") != NULL || strstr(value, "Mi") != NULL) {
-                    char *num_part = strdup(value);
-                    if (num_part == NULL) {
-                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
-                        break;
-                    }
-                    num_part[strlen(num_part) - (strstr(value, "Mi") ? 2 : 1)] = '\0';
-                    stats->sum += atof(num_part);
-                    free(num_part);
-                } else if (strstr(value, "G") != NULL || strstr(value, "Gi") != NULL) {
-                    char *num_part = strdup(value);
-                    if (num_part == NULL) {
-                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
-                        break;
-                    }
-                    num_part[strlen(num_part) - (strstr(value, "Gi") ? 2 : 1)] = '\0';
-                    stats->sum += atof(num_part) * 1000;
-                    free(num_part);
-                } else if (strstr(value, "K") != NULL || strstr(value, "Ki") != NULL) {
-                    char *num_part = strdup(value);
-                    if (num_part == NULL) {
-                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
-                        break;
-                    }
-                    num_part[strlen(num_part) - (strstr(value, "Ki") ? 2 : 1)] = '\0';
-                    stats->sum += atof(num_part) / 1000.0;
-                    free(num_part);
-                }
-            } else if (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT) {
-                stats->sum += atof(value);
+    // Always update count for non-null values (needed for min/max display logic)
+    stats->count++;
+    
+    // Process numeric values for sum, min, max, and avg calculations
+    if (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT) {
+        double num_val = atof(value);
+        
+        // Update sum
+        stats->sum += num_val;
+        
+        // Update min
+        if (!stats->min_initialized) {
+            stats->min = num_val;
+            stats->min_initialized = 1;
+        } else if (num_val < stats->min) {
+            stats->min = num_val;
+        }
+        
+        // Update max
+        if (!stats->max_initialized) {
+            stats->max = num_val;
+            stats->max_initialized = 1;
+        } else if (num_val > stats->max) {
+            stats->max = num_val;
+        }
+        
+        // Update avg
+        stats->avg_sum += num_val;
+        stats->avg_count++;
+        
+    } else if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
+        char *num_part = strdup(value);
+        if (num_part) {
+            num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
+            double num_val = atof(num_part);
+            free(num_part);
+            
+            // Update sum
+            stats->sum += num_val;
+            
+            // Update min
+            if (!stats->min_initialized) {
+                stats->min = num_val;
+                stats->min_initialized = 1;
+            } else if (num_val < stats->min) {
+                stats->min = num_val;
             }
-            break;
-        case SUMMARY_MIN:
-            if (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT) {
-                double num_val = atof(value);
-                if (!stats->min_initialized) {
-                    stats->min = num_val;
-                    stats->min_initialized = 1;
-                } else if (num_val < stats->min) {
-                    stats->min = num_val;
-                }
-            } else if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
-                char *num_part = strdup(value);
-                if (num_part) {
-                    num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
-                    double num_val = atof(num_part);
-                    free(num_part);
-                    if (!stats->min_initialized) {
-                        stats->min = num_val;
-                        stats->min_initialized = 1;
-                    } else if (num_val < stats->min) {
-                        stats->min = num_val;
-                    }
-                }
-            } else if (data_type == DATA_KMEM) {
-                char *num_part = strdup(value);
-                if (num_part) {
-                    char *unit = strstr(num_part, "M");
-                    if (unit) {
-                        *unit = '\0';
-                        double num_val = atof(num_part);
-                        free(num_part);
-                        if (!stats->min_initialized) {
-                            stats->min = num_val;
-                            stats->min_initialized = 1;
-                        } else if (num_val < stats->min) {
-                            stats->min = num_val;
-                        }
-                    } else {
-                        free(num_part);
-                    }
-                }
+            
+            // Update max
+            if (!stats->max_initialized) {
+                stats->max = num_val;
+                stats->max_initialized = 1;
+            } else if (num_val > stats->max) {
+                stats->max = num_val;
             }
-            break;
-        case SUMMARY_MAX:
-            if (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT) {
-                double num_val = atof(value);
-                if (!stats->max_initialized) {
-                    stats->max = num_val;
-                    stats->max_initialized = 1;
-                } else if (num_val > stats->max) {
-                    stats->max = num_val;
-                }
-            } else if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
-                char *num_part = strdup(value);
-                if (num_part) {
-                    num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
-                    double num_val = atof(num_part);
-                    free(num_part);
-                    if (!stats->max_initialized) {
-                        stats->max = num_val;
-                        stats->max_initialized = 1;
-                    } else if (num_val > stats->max) {
-                        stats->max = num_val;
-                    }
-                }
-            } else if (data_type == DATA_KMEM) {
-                char *num_part = strdup(value);
-                if (num_part) {
-                    char *unit = strstr(num_part, "M");
-                    if (unit) {
-                        *unit = '\0';
-                        double num_val = atof(num_part);
-                        free(num_part);
-                        if (!stats->max_initialized) {
-                            stats->max = num_val;
-                            stats->max_initialized = 1;
-                        } else if (num_val > stats->max) {
-                            stats->max = num_val;
-                        }
-                    } else {
-                        free(num_part);
-                    }
-                }
+        }
+        
+    } else if (data_type == DATA_KMEM) {
+        // Handle different memory units
+        char *num_part = strdup(value);
+        if (num_part) {
+            double multiplier = 1.0;
+            double num_val = 0.0;
+            
+            if (strstr(value, "Mi") != NULL) {
+                num_part[strlen(num_part) - 2] = '\0';
+                multiplier = 1.0;
+            } else if (strstr(value, "M") != NULL) {
+                num_part[strlen(num_part) - 1] = '\0';
+                multiplier = 1.0;
+            } else if (strstr(value, "Gi") != NULL) {
+                num_part[strlen(num_part) - 2] = '\0';
+                multiplier = 1000.0;
+            } else if (strstr(value, "G") != NULL) {
+                num_part[strlen(num_part) - 1] = '\0';
+                multiplier = 1000.0;
+            } else if (strstr(value, "Ki") != NULL) {
+                num_part[strlen(num_part) - 2] = '\0';
+                multiplier = 1.0 / 1000.0;
+            } else if (strstr(value, "K") != NULL) {
+                num_part[strlen(num_part) - 1] = '\0';
+                multiplier = 1.0 / 1000.0;
             }
-            break;
-        case SUMMARY_COUNT:
-            stats->count++;
-            break;
-        case SUMMARY_UNIQUE:
-            // Check if value is already in unique_values
-            for (int i = 0; i < stats->unique_count; i++) {
-                if (strcmp(stats->unique_values[i], value) == 0) {
-                    if (debug_mode) {
-                        fprintf(stderr, "Debug: Value '%s' already in unique_values for column %d\n", value, col_idx);
-                    }
-                    return; // Already exists
-                }
+            
+            num_val = atof(num_part) * multiplier;
+            free(num_part);
+            
+            // Update sum
+            stats->sum += num_val;
+            
+            // Update min
+            if (!stats->min_initialized) {
+                stats->min = num_val;
+                stats->min_initialized = 1;
+            } else if (num_val < stats->min) {
+                stats->min = num_val;
             }
-            // Add new unique value
-            if (debug_mode) {
-                fprintf(stderr, "Debug: Adding new unique value '%s' for column %d, new count will be %d\n", value, col_idx, stats->unique_count + 1);
+            
+            // Update max
+            if (!stats->max_initialized) {
+                stats->max = num_val;
+                stats->max_initialized = 1;
+            } else if (num_val > stats->max) {
+                stats->max = num_val;
             }
-            char **new_unique_values = realloc(stats->unique_values, (stats->unique_count + 1) * sizeof(char *));
-            if (new_unique_values == NULL) {
-                fprintf(stderr, "Error: Memory allocation failed for unique values\n");
-                return;
-            }
-            stats->unique_values = new_unique_values;
-            stats->unique_values[stats->unique_count] = strdup_safe(value);
-            if (stats->unique_values[stats->unique_count] == NULL) {
-                fprintf(stderr, "Error: Memory allocation failed for unique value string\n");
-            } else {
+        }
+    }
+    
+    // Handle unique values tracking (only when needed)
+    if (summary_type == SUMMARY_UNIQUE) {
+        // Check if value is already in unique_values
+        for (int i = 0; i < stats->unique_count; i++) {
+            if (strcmp(stats->unique_values[i], value) == 0) {
                 if (debug_mode) {
-                    fprintf(stderr, "Debug: Successfully added unique value '%s' at index %d for column %d\n", value, stats->unique_count, col_idx);
+                    fprintf(stderr, "Debug: Value '%s' already in unique_values for column %d\n", value, col_idx);
                 }
+                return; // Already exists
             }
-            stats->unique_count++;
-            break;
-        case SUMMARY_AVG:
-            if (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT) {
-                stats->avg_sum += atof(value);
-                stats->avg_count++;
+        }
+        // Add new unique value
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Adding new unique value '%s' for column %d, new count will be %d\n", value, col_idx, stats->unique_count + 1);
+        }
+        char **new_unique_values = realloc(stats->unique_values, (stats->unique_count + 1) * sizeof(char *));
+        if (new_unique_values == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for unique values\n");
+            return;
+        }
+        stats->unique_values = new_unique_values;
+        stats->unique_values[stats->unique_count] = strdup_safe(value);
+        if (stats->unique_values[stats->unique_count] == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for unique value string\n");
+        } else {
+            if (debug_mode) {
+                fprintf(stderr, "Debug: Successfully added unique value '%s' at index %d for column %d\n", value, stats->unique_count, col_idx);
             }
-            break;
-        default:
-            break;
+        }
+        stats->unique_count++;
     }
 }
 

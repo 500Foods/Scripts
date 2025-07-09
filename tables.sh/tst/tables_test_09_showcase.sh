@@ -1078,7 +1078,7 @@ cat > "$layout_file" << 'EOF'
       "key": "bandwidth_mbps",
       "datatype": "float",
       "justification": "right",
-      "summary": "avg"
+      "summary": "sum"
     }
   ]
 }

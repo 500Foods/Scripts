@@ -309,7 +309,7 @@ render_table_output() {
   echo "DEBUG: Layout saved to $LAYOUT_FILE" >> "$DEBUG_LOG"
   
   # Call tables.sh to render the table
-  bash "../tables/tables.sh" "$LAYOUT_FILE" "$RESULTS_FILE"
+  "../tables.c/tables" "$LAYOUT_FILE" "$RESULTS_FILE"
   
   # Clean up temporary files for table rendering
   if [ "$DEBUG" = false ]; then

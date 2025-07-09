@@ -49,7 +49,10 @@ void render_title(TableConfig *config, int total_width) {
         max_title_width = total_width > 4 ? total_width - 4 : 0;
     }
 
-    if (box_width > total_width && config->title_pos != POSITION_NONE) {
+    // Only clip titles for positioned titles (left, center, right) when they exceed table width
+    // Default/none positioned titles can extend beyond table width
+    if (box_width > total_width && (config->title_pos == POSITION_LEFT ||
+        config->title_pos == POSITION_CENTER || config->title_pos == POSITION_RIGHT)) {
         char *clipped_title = clip_text_to_width(display_title, max_title_width);
         if (clipped_title) {
             if (display_title != processed_title) {
@@ -65,9 +68,21 @@ void render_title(TableConfig *config, int total_width) {
     } else if (config->title_pos == POSITION_NONE) {
         box_width = title_width + 4;
     } else {
-        box_width = title_width + 4;
-        if (box_width > total_width) {
+        // For positioned titles (left, center, right), if the title is longer than table width,
+        // clip it to fit within the table width
+        if (title_width + 4 > total_width) {
+            // Need to clip the title further to fit within table width
+            char *further_clipped = clip_text_to_width(display_title, total_width - 4);
+            if (further_clipped) {
+                if (display_title != processed_title) {
+                    free(display_title);
+                }
+                display_title = further_clipped;
+                title_width = get_display_width(display_title);
+            }
             box_width = total_width;
+        } else {
+            box_width = title_width + 4;
         }
     }
 
@@ -94,9 +109,17 @@ void render_title(TableConfig *config, int total_width) {
 
     if (config->title_pos == POSITION_FULL) {
         // For full position, center the text within the available width (excluding borders)
-        int spaces = (available_width - text_width) / 2;
-        left_padding = spaces;  // Just the calculated spaces, no additional padding
-        right_padding = available_width - text_width - spaces;  // Remaining space
+        // Ensure at least 1 space padding on each side
+        int effective_text_width = available_width - 2; // Reserve space for padding
+        if (text_width > effective_text_width) {
+            // Need to re-clip the text to leave room for padding
+            free(clipped_text);
+            clipped_text = clip_text_to_width(display_title, effective_text_width);
+            text_width = get_display_width(clipped_text);
+        }
+        int spaces = (available_width - text_width - 2) / 2; // -2 for minimum padding
+        left_padding = 1 + spaces;  // At least 1 space + centering
+        right_padding = available_width - text_width - left_padding;
     }
 
     printf("%*s%s%s%*s", left_padding, "", config->theme.header_color, clipped_text, right_padding, "");
@@ -135,10 +158,17 @@ void render_top_border_with_title(TableConfig *config, int total_width, int titl
     if (title_present) {
         int title_start = title_padding;
         int title_end = title_padding + box_width - 1;
+        
+        // For positioned titles (left, center, right), never extend beyond table width
+        // Only default/none positioned titles can extend beyond table width
+        int render_width = total_width;
+        if (config->title_pos == POSITION_NONE && title_end >= total_width - 1) {
+            render_width = title_end + 1;
+        }
 
-        for (int i = 0; i < total_width; i++) {
+        for (int i = 0; i < render_width; i++) {
             int is_col_junct = 0;
-            if (column_positions) {
+            if (column_positions && i < total_width) {
                 for (int k = 0; k < col_pos_count; k++) {
                     if (i == column_positions[k] + 1) {
                         is_col_junct = 1;
@@ -148,15 +178,43 @@ void render_top_border_with_title(TableConfig *config, int total_width, int titl
             }
 
             if (i == 0) {
+                // If title starts at position 0, use l_junct (connects to table)
+                // If title doesn't start at position 0, use tl_corner (standalone corner)
                 printf("%s", (title_start == 0) ? config->theme.l_junct : config->theme.tl_corner);
-            } else if (i == total_width - 1) {
-                printf("%s", (title_end >= total_width - 1) ? config->theme.r_junct : config->theme.tr_corner);
+            } else if (i == render_width - 1) {
+                // If we're at the end of the render width
+                if (title_end >= total_width - 1 && render_width == total_width) {
+                    // Title spans full table width - use right junction
+                    printf("%s", config->theme.r_junct);
+                } else if (title_end >= total_width - 1) {
+                    // Title extends beyond table width - use appropriate corner
+                    printf("%s", is_col_junct ? config->theme.r_junct : config->theme.br_corner);
+                } else {
+                    // Title is within table width - use top-right corner
+                    printf("%s", config->theme.tr_corner);
+                }
             } else if (i == title_start) {
-                printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
-            } else if (i == title_end && title_end < total_width - 1) {
-                printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
+                // For positioned titles that have been clipped to table width, use l_junct to connect
+                if ((config->title_pos == POSITION_CENTER || config->title_pos == POSITION_RIGHT) &&
+                    box_width == total_width && title_start > 0) {
+                    printf("%s", config->theme.l_junct);
+                } else {
+                    printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
+                }
+            } else if (i == title_end && title_end < render_width - 1) {
+                // If title ends before the render width, use appropriate junction
+                if (i >= total_width - 1) {
+                    printf("%s", config->theme.br_corner);
+                } else {
+                    printf("%s", is_col_junct ? config->theme.cross : config->theme.b_junct);
+                }
+            } else if (i == total_width - 1 && title_end > total_width - 1) {
+                printf("%s", config->theme.t_junct);  // Junction at table edge when title extends beyond
             } else if (i > title_start && i < title_end) {
                 printf("%s", is_col_junct ? config->theme.t_junct : config->theme.h_line);
+            } else if (i >= total_width && i < title_end) {
+                // Extension beyond table width - just horizontal lines
+                printf("%s", config->theme.h_line);
             } else {
                 printf("%s", is_col_junct ? config->theme.t_junct : config->theme.h_line);
             }

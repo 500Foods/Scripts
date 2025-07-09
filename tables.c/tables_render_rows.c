@@ -77,29 +77,41 @@ void render_rows(TableConfig *config, TableData *data) {
             if (col->width_specified && col->wrap_mode == WRAP_CLIP) {
                 // Truncate if width is specified and wrapping is disabled
                 int display_width = get_display_width(formatted);
-                int effective_width = col->width - 2; // Account for 1 space padding on each side
+                int effective_width = col->width - 2; // Account for padding on both sides (1 left + 1 right)
                 if (display_width > effective_width) {
                     char *truncated = malloc(col->width + 1);
                     if (truncated) {
                         int k = 0, display_count = 0;
                         int in_ansi = 0;
-                        const char *start_p = formatted;
                         const char *end_p = formatted + strlen(formatted) - 1;
                         
                         if (col->justify == JUSTIFY_RIGHT) {
                             // For right justification, start from the end and take the last 'effective_width' characters
-                            int target_count = effective_width;
-                            for (const char *p = end_p; p >= formatted && target_count > 0; p--) {
-                                if (*p == '\033') in_ansi = 1;
-                                else if (in_ansi && *p == 'm') in_ansi = 0;
-                                else if (!in_ansi) target_count--;
-                                if (target_count <= 0) {
-                                    start_p = p;
-                                    break;
+                            int char_count = 0;
+                            const char *start_pos = formatted;
+                            
+                            // Count total display characters first
+                            int total_chars = get_display_width(formatted);
+                            int chars_to_skip = total_chars - effective_width;
+                            
+                            // Skip the first chars_to_skip display characters
+                            for (const char *p = formatted; *p && char_count < chars_to_skip; p++) {
+                                if (*p == '\033') {
+                                    in_ansi = 1;
+                                    start_pos = p;
+                                } else if (in_ansi && *p == 'm') {
+                                    in_ansi = 0;
+                                    start_pos = p + 1;
+                                } else if (in_ansi) {
+                                    start_pos = p;
+                                } else {
+                                    char_count++;
+                                    start_pos = p + 1;
                                 }
                             }
-                            if (start_p < formatted) start_p = formatted;
-                            for (const char *p = start_p; *p; p++) {
+                            
+                            // Copy from start_pos to end
+                            for (const char *p = start_pos; *p; p++) {
                                 truncated[k++] = *p;
                             }
                         } else if (col->justify == JUSTIFY_CENTER) {
@@ -165,7 +177,7 @@ void render_rows(TableConfig *config, TableData *data) {
                         // Clip each wrapped line if it exceeds the width
                         for (int l = 0; l < line_count; l++) {
                             int display_width = get_display_width(wrapped[l]);
-                            int effective_width = col->width - 2;
+                            int effective_width = (col->justify == JUSTIFY_RIGHT) ? col->width - 1 : col->width - 2;
                             if (display_width > effective_width) {
                                 char *truncated = malloc(effective_width + 1);
                                 if (truncated) {
@@ -224,6 +236,8 @@ void render_rows(TableConfig *config, TableData *data) {
                                             }
                                         }
                                     } else {
+                                        // Left justification (default), take first 'effective_width' characters
+                                        // Use same logic as main clipping section (lines 152-158)
                                         for (const char *p = wrapped[l]; *p && display_count < effective_width; p++) {
                                             if (*p == '\033') in_ansi = 1;
                                             else if (in_ansi && *p == 'm') in_ansi = 0;

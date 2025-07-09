@@ -31,19 +31,32 @@ static char *strdup_safe(const char *str) {
 char *format_with_commas(const char *num_str) {
     if (num_str == NULL || strlen(num_str) == 0) return strdup("");
     
-    char *result = malloc(strlen(num_str) * 2); // Enough space for commas
+    // Find decimal point if it exists
+    char *decimal_point = strchr(num_str, '.');
+    int integer_len;
+    char *decimal_part = NULL;
+    
+    if (decimal_point) {
+        integer_len = decimal_point - num_str;
+        decimal_part = decimal_point; // Include the decimal point and everything after
+    } else {
+        integer_len = strlen(num_str);
+    }
+    
+    // Calculate space needed for commas in integer part only
+    int comma_count = integer_len > 3 ? (integer_len - 1) / 3 : 0;
+    int decimal_len = decimal_part ? strlen(decimal_part) : 0;
+    int new_len = integer_len + comma_count + decimal_len;
+    
+    char *result = malloc(new_len + 1);
     if (result == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for number formatting\n");
         return strdup("");
     }
     
-    int len = strlen(num_str);
-    int comma_count = (len - 1) / 3;
-    int new_len = len + comma_count;
-    result[new_len] = '\0';
-    
-    int src_idx = len - 1;
-    int dst_idx = new_len - 1;
+    // Process integer part (add commas from right to left)
+    int src_idx = integer_len - 1;
+    int dst_idx = integer_len + comma_count - 1;
     int count = 0;
     
     while (src_idx >= 0) {
@@ -55,6 +68,12 @@ char *format_with_commas(const char *num_str) {
         }
     }
     
+    // Add decimal part if it exists
+    if (decimal_part) {
+        strcpy(result + integer_len + comma_count, decimal_part);
+    }
+    
+    result[new_len] = '\0';
     return result;
 }
 
@@ -162,12 +181,8 @@ char *format_number(const char *value, const char *format, int string_limit, int
         return strdup(buffer);
     }
     
-    // For integers, apply thousands separators
-    if (strchr(value, '.') == NULL) {
-        return format_with_commas(value);
-    }
-    
-    return strdup(value);
+    // Apply thousands separators to all numbers
+    return format_with_commas(value);
 }
 
 /*
@@ -513,7 +528,8 @@ char *format_display_value_with_precision(const char *value, ValueDisplay null_v
             snprintf(format_str, sizeof(format_str), "%%.%df", max_decimal_places);
             char buffer[256];
             snprintf(buffer, sizeof(buffer), format_str, atof(value));
-            display_value = strdup(buffer);
+            // Apply thousands separators to the formatted float
+            display_value = format_with_commas(buffer);
         } else {
             display_value = handler->format(value, format, string_limit, wrap_mode, wrap_char, justification);
         }

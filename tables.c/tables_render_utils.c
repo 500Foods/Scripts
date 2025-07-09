@@ -578,7 +578,6 @@ char *replace_color_placeholders(const char *input) {
  * Clip text to a specified width, handling multi-byte characters and ANSI codes
  */
 char *clip_text(const char *text, int width, Position justification) {
-    (void)justification;
     if (text == NULL) {
         return strdup("");
     }
@@ -588,15 +587,97 @@ char *clip_text(const char *text, int width, Position justification) {
         return strdup(text);
     }
 
-    // This is a simplified clipping logic. A proper implementation would need to be
-    // aware of multi-byte characters and ANSI escape codes during the clipping process.
-    char *clipped = malloc(width + 1);
-    if (clipped == NULL) {
-        return strdup("");
+    if (justification == POSITION_CENTER) {
+        // For center justification, clip from both ends to show the middle
+        int chars_to_remove = display_width - width;
+        int left_remove = chars_to_remove / 2;
+        
+        // First, skip left_remove characters from the beginning
+        int current_width = 0;
+        int start_pos = 0;
+        int in_ansi = 0;
+        
+        while (text[start_pos] != '\0' && current_width < left_remove) {
+            if (text[start_pos] == '\033') {
+                in_ansi = 1;
+                start_pos++;
+            } else if (in_ansi && text[start_pos] == 'm') {
+                in_ansi = 0;
+                start_pos++;
+            } else if (in_ansi) {
+                start_pos++;
+            } else {
+                // Count display characters
+                int char_bytes = 1;
+                if ((text[start_pos] & 0x80) == 0) {
+                    char_bytes = 1; // ASCII
+                } else if ((text[start_pos] & 0xE0) == 0xC0) {
+                    char_bytes = 2;
+                } else if ((text[start_pos] & 0xF0) == 0xE0) {
+                    char_bytes = 3;
+                } else if ((text[start_pos] & 0xF8) == 0xF0) {
+                    char_bytes = 4;
+                }
+                
+                char temp_char[5] = {0};
+                for (int i = 0; i < char_bytes && text[start_pos + i] != '\0'; i++) {
+                    temp_char[i] = text[start_pos + i];
+                }
+                
+                current_width += get_display_width(temp_char);
+                start_pos += char_bytes;
+            }
+        }
+        
+        // Now get the middle portion of the desired width
+        char *middle_text = clip_text_to_width(text + start_pos, width);
+        return middle_text;
+    } else if (justification == POSITION_RIGHT) {
+        // For right justification, skip characters from the beginning to show the end
+        int chars_to_remove = display_width - width;
+        
+        // Skip chars_to_remove characters from the beginning
+        int current_width = 0;
+        int start_pos = 0;
+        int in_ansi = 0;
+        
+        while (text[start_pos] != '\0' && current_width < chars_to_remove) {
+            if (text[start_pos] == '\033') {
+                in_ansi = 1;
+                start_pos++;
+            } else if (in_ansi && text[start_pos] == 'm') {
+                in_ansi = 0;
+                start_pos++;
+            } else if (in_ansi) {
+                start_pos++;
+            } else {
+                // Count display characters
+                int char_bytes = 1;
+                if ((text[start_pos] & 0x80) == 0) {
+                    char_bytes = 1; // ASCII
+                } else if ((text[start_pos] & 0xE0) == 0xC0) {
+                    char_bytes = 2;
+                } else if ((text[start_pos] & 0xF0) == 0xE0) {
+                    char_bytes = 3;
+                } else if ((text[start_pos] & 0xF8) == 0xF0) {
+                    char_bytes = 4;
+                }
+                
+                char temp_char[5] = {0};
+                for (int i = 0; i < char_bytes && text[start_pos + i] != '\0'; i++) {
+                    temp_char[i] = text[start_pos + i];
+                }
+                
+                current_width += get_display_width(temp_char);
+                start_pos += char_bytes;
+            }
+        }
+        
+        // Now get the remaining portion (which should be exactly width characters)
+        char *right_text = clip_text_to_width(text + start_pos, width);
+        return right_text;
+    } else {
+        // For left or other justifications, use standard left-based clipping
+        return clip_text_to_width(text, width);
     }
-    
-    strncpy(clipped, text, width);
-    clipped[width] = '\0';
-    
-    return clipped;
 }
