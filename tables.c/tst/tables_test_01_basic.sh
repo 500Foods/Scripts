@@ -15,11 +15,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Check for --debug flag
+# Check for debug flags
 DEBUG_FLAG=""
+DEBUG_LAYOUT_FLAG=""
 if [[ "$1" == "--debug" ]]; then
     DEBUG_FLAG="--debug"
     echo "Debug mode enabled"
+elif [[ "$1" == "--debug_layout" ]]; then
+    DEBUG_LAYOUT_FLAG="--debug_layout"
+    echo "Debug layout mode enabled"
+elif [[ "$1" == "--debug" && "$2" == "--debug_layout" ]]; then
+    DEBUG_FLAG="--debug"
+    DEBUG_LAYOUT_FLAG="--debug_layout"
+    echo "Debug and Debug layout modes enabled"
+elif [[ "$1" == "--debug_layout" && "$2" == "--debug" ]]; then
+    DEBUG_FLAG="--debug"
+    DEBUG_LAYOUT_FLAG="--debug_layout"
+    echo "Debug and Debug layout modes enabled"
 fi
 
 # Setup comprehensive test data showcasing all datatypes
@@ -100,7 +112,7 @@ EOF
 
 echo "TestC 1-A: Integer and Text datatypes with different justifications"
 echo "------------------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
 
 # Test 1-B: Numeric datatypes - int, num, float (Theme: Blue)
@@ -132,7 +144,7 @@ EOF
 
 echo -e "\nTestC 1-B: Numeric datatypes - int, num, float"
 echo "-----------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
 # Test 1-C: Kubernetes resource datatypes - kcpu and kmem (Theme: Red)
 cat > "$layout_file" << 'EOF'
@@ -163,7 +175,7 @@ EOF
 
 echo -e "\nTestC 1-C: Kubernetes resource datatypes - kcpu and kmem"
 echo "---------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
 # Test 1-D: Mixed datatypes with center justification focus (Theme: Blue)
 cat > "$layout_file" << 'EOF'
@@ -194,7 +206,7 @@ EOF
 
 echo -e "\nTestC 1-D: Mixed datatypes with center justification focus"
 echo "-----------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
 # Test 1-E: All datatypes in single table (Theme: Red)
 cat > "$layout_file" << 'EOF'
@@ -243,7 +255,7 @@ EOF
 
 echo -e "\nTestC 1-E: All datatypes in single table"
 echo "-----------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
 # Test 1-F: Text datatype with different justifications (Theme: Blue)
 cat > "$layout_file" << 'EOF'
@@ -274,4 +286,4 @@ EOF
 
 echo -e "\nTestC 1-F: Text datatype with different justifications"
 echo "-------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG

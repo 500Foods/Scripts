@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Test Suite 6: Title Positions - Validation of table header positions
+# Test Suite 6: Title Positions - Validation of table header positions (C Version)
 # This test suite focuses on validating the rendering of table headers in different positions
 # (not supplied, left, center, right) with headers of varying lengths relative to table width
 # (less than, equal to, greater than table width).
@@ -8,7 +8,7 @@
 # Create temporary files for our JSON
 layout_file=$(mktemp)
 data_file=$(mktemp)
-tables_script="$(dirname "$0")/../tables.sh"
+tables_script="$(dirname "$0")/../tables"
 
 # Cleanup function
 cleanup() {
@@ -16,12 +16,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Check for --debug flag
+# Check for --debug or --debug_layout flag
 DEBUG_FLAG=""
-if [[ "$1" == "--debug" ]]; then
-    DEBUG_FLAG="--debug"
-    echo "Debug mode enabled"
-fi
+DEBUG_LAYOUT_FLAG=""
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --debug)
+            DEBUG_FLAG="--debug"
+            echo "Debug mode enabled"
+            ;;
+        --debug_layout)
+            DEBUG_LAYOUT_FLAG="--debug_layout"
+            echo "Debug layout mode enabled"
+            ;;
+    esac
+    shift
+done
 
 # Setup test data with consistent server information
 cat > "$data_file" << 'EOF'
@@ -53,7 +63,7 @@ cat > "$data_file" << 'EOF'
 ]
 EOF
 
-# Test 6-A: Not Supplied - Header less than table width
+# TestC 6-A: Not Supplied - Header less than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
@@ -87,11 +97,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo "Test 6-A: Not Supplied - Header less than table width"
-echo "----------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo "TestC 6-A: Not Supplied - Header less than table width"
+echo "-----------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-B: Not Supplied - Header equal to table width
+# TestC 6-B: Not Supplied - Header equal to table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
@@ -129,11 +139,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-B: Not Supplied - Header equal to table width"
-echo "---------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-B: Not Supplied - Header equal to table width"
+echo "----------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-C: Not Supplied - Header greater than table width
+# TestC 6-C: Not Supplied - Header greater than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
@@ -171,11 +181,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-C: Not Supplied - Header greater than table width"
-echo "-------------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-C: Not Supplied - Header greater than table width"
+echo "--------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-D: Left - Header less than table width
+# TestC 6-D: Left - Header less than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Blue",
@@ -210,179 +220,179 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-D: Left - Header less than table width"
-echo "--------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
-
-# Test 6-E: Left - Header equal to table width
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Blue",
-  "title": "Server Performance Metrics Report Data 23",
-  "title_position": "left",
-  "columns": [
-    {
-      "header": "ID",
-      "key": "id",
-      "datatype": "int",
-      "justification": "right",
-      "width": 5
-    },
-    {
-      "header": "Server Name",
-      "key": "server_name",
-      "datatype": "text",
-      "justification": "left",
-      "width": 15
-    },
-    {
-      "header": "CPU Cores",
-      "key": "cpu_cores",
-      "datatype": "num",
-      "justification": "right",
-      "width": 10
-    },
-    {
-      "header": "Load Avg",
-      "key": "load_avg",
-      "datatype": "float",
-      "justification": "right",
-      "width": 10
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 6-E: Left - Header equal to table width"
-echo "-------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
-
-# Test 6-F: Left - Header greater than table width
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Blue",
-  "title": "Detailed Server Performance and Configuration Analysis Report for Q2 2023",
-  "title_position": "left",
-  "columns": [
-    {
-      "header": "ID",
-      "key": "id",
-      "datatype": "int",
-      "justification": "right",
-      "width": 3
-    },
-    {
-      "header": "Server Name",
-      "key": "server_name",
-      "datatype": "text",
-      "justification": "left",
-      "width": 10
-    },
-    {
-      "header": "CPU Cores",
-      "key": "cpu_cores",
-      "datatype": "num",
-      "justification": "right",
-      "width": 5
-    },
-    {
-      "header": "Load Avg",
-      "key": "load_avg",
-      "datatype": "float",
-      "justification": "right",
-      "width": 5
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 6-F: Left - Header greater than table width"
-echo "-----------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
-
-# Test 6-G: Center - Header less than table width
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Red",
-  "title": "Server Report",
-  "title_position": "center",
-  "columns": [
-    {
-      "header": "ID",
-      "key": "id",
-      "datatype": "int",
-      "justification": "right"
-    },
-    {
-      "header": "Server Name",
-      "key": "server_name",
-      "datatype": "text",
-      "justification": "left"
-    },
-    {
-      "header": "CPU Cores",
-      "key": "cpu_cores",
-      "datatype": "num",
-      "justification": "right"
-    },
-    {
-      "header": "Load Avg",
-      "key": "load_avg",
-      "datatype": "float",
-      "justification": "right"
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 6-G: Center - Header less than table width"
-echo "----------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
-
-# Test 6-H: Center - Header equal to table width
-cat > "$layout_file" << 'EOF'
-{
-  "theme": "Red",
-  "title": "Server Performance Metrics Report Data 23",
-  "title_position": "center",
-  "columns": [
-    {
-      "header": "ID",
-      "key": "id",
-      "datatype": "int",
-      "justification": "right",
-      "width": 5
-    },
-    {
-      "header": "Server Name",
-      "key": "server_name",
-      "datatype": "text",
-      "justification": "left",
-      "width": 15
-    },
-    {
-      "header": "CPU Cores",
-      "key": "cpu_cores",
-      "datatype": "num",
-      "justification": "right",
-      "width": 10
-    },
-    {
-      "header": "Load Avg",
-      "key": "load_avg",
-      "datatype": "float",
-      "justification": "right",
-      "width": 10
-    }
-  ]
-}
-EOF
-
-echo -e "\nTest 6-H: Center - Header equal to table width"
+echo -e "\nTestC 6-D: Left - Header less than table width"
 echo "---------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-I: Center - Header greater than table width
+# TestC 6-E: Left - Header equal to table width
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "title": "Server Performance Metrics Report Data 23",
+  "title_position": "left",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right",
+      "width": 5
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left",
+      "width": 15
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right",
+      "width": 10
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right",
+      "width": 10
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 6-E: Left - Header equal to table width"
+echo "--------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# TestC 6-F: Left - Header greater than table width
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "title": "Detailed Server Performance and Configuration Analysis Report for Q2 2023",
+  "title_position": "left",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right",
+      "width": 3
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left",
+      "width": 10
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right",
+      "width": 5
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right",
+      "width": 5
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 6-F: Left - Header greater than table width"
+echo "------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# TestC 6-G: Center - Header less than table width
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "Server Report",
+  "title_position": "center",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right"
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left"
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right"
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 6-G: Center - Header less than table width"
+echo "-----------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# TestC 6-H: Center - Header equal to table width
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "Server Performance Metrics Report Data 23",
+  "title_position": "center",
+  "columns": [
+    {
+      "header": "ID",
+      "key": "id",
+      "datatype": "int",
+      "justification": "right",
+      "width": 5
+    },
+    {
+      "header": "Server Name",
+      "key": "server_name",
+      "datatype": "text",
+      "justification": "left",
+      "width": 15
+    },
+    {
+      "header": "CPU Cores",
+      "key": "cpu_cores",
+      "datatype": "num",
+      "justification": "right",
+      "width": 10
+    },
+    {
+      "header": "Load Avg",
+      "key": "load_avg",
+      "datatype": "float",
+      "justification": "right",
+      "width": 10
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 6-H: Center - Header equal to table width"
+echo "----------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# TestC 6-I: Center - Header greater than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Red",
@@ -421,11 +431,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-I: Center - Header greater than table width"
-echo "-------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-I: Center - Header greater than table width"
+echo "--------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-J: Right - Header less than table width
+# TestC 6-J: Right - Header less than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Blue",
@@ -460,11 +470,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-J: Right - Header less than table width"
-echo "---------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-J: Right - Header less than table width"
+echo "----------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-K: Right - Header equal to table width
+# TestC 6-K: Right - Header equal to table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Blue",
@@ -503,11 +513,11 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-K: Right - Header equal to table width"
-echo "--------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-K: Right - Header equal to table width"
+echo "---------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
 
-# Test 6-L: Right - Header greater than table width
+# TestC 6-L: Right - Header greater than table width
 cat > "$layout_file" << 'EOF'
 {
   "theme": "Blue",
@@ -545,6 +555,6 @@ cat > "$layout_file" << 'EOF'
 }
 EOF
 
-echo -e "\nTest 6-L: Right - Header greater than table width"
-echo "------------------------------------------------"
-"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG
+echo -e "\nTestC 6-L: Right - Header greater than table width"
+echo "-------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG

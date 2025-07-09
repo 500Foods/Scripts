@@ -1,12 +1,12 @@
 # Makefile for tables C implementation
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable $(shell pkg-config --cflags jansson)
+CFLAGS = -Wall -Wextra -O2 $(shell pkg-config --cflags jansson)
 LDFLAGS = $(shell pkg-config --libs jansson)
 TARGET = tables
 SOURCES = *.c
 
-# Default target to build the executable
-all: $(TARGET)
+# Default target to build the executable, ensuring clean is run first
+all: clean $(TARGET)
 
 $(TARGET):
 	$(CC) $(CFLAGS) $(SOURCES) -o $(TARGET) $(LDFLAGS)

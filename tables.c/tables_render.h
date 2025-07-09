@@ -1,6 +1,5 @@
 /*
- * tables_render.h - Header file for table rendering in the tables utility
- * Defines structures and function prototypes for rendering formatted tables.
+ * tables_render.h - Header file for table rendering functionality
  */
 
 #ifndef TABLES_RENDER_H
@@ -8,12 +7,16 @@
 
 #include "tables_config.h"
 #include "tables_data.h"
+#include "tables_render_utils.h"
+#include "tables_render_layout.h"
+#include "tables_render_output.h"
+#include "tables_render_title.h"
+#include "tables_render_headers.h"
+#include "tables_render_rows.h"
+#include "tables_render_summaries.h"
+#include "tables_render_footer.h"
 
-/* Function prototypes */
+// Main rendering function
 void render_table(TableConfig *config, TableData *data);
-void calculate_column_widths(TableConfig *config, TableData *data);
-int get_display_width(const char *text);
-char **wrap_text(const char *text, int width, int *line_count);
-void free_wrapped_text(char **lines, int line_count);
 
 #endif /* TABLES_RENDER_H */

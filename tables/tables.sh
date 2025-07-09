@@ -427,12 +427,28 @@ update_summaries() {
                 if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then SUM_SUMMARIES[$j]=$(echo "${SUM_SUMMARIES[$j]:-0} + $value" | bc); fi
             fi;;
         min)
-            if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || (( $(printf "%.0f" "$value") < $(printf "%.0f" "${MIN_SUMMARIES[$j]}") )); then MIN_SUMMARIES[$j]="$value"; fi
+            if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then
+                local num_val="${value%m}"
+                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || (( num_val < ${MIN_SUMMARIES[$j]:-999999} )); then MIN_SUMMARIES[$j]="$num_val"; fi
+            elif [[ "$datatype" == "kmem" && "$value" =~ ^[0-9]+[KMG]$ ]]; then
+                local num_val="${value%[KMG]}"
+                local unit="${value: -1}"
+                if [[ "$unit" == "G" ]]; then num_val=$((num_val * 1000)); elif [[ "$unit" == "K" ]]; then num_val=$((num_val / 1000)); fi
+                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || (( num_val < ${MIN_SUMMARIES[$j]:-999999} )); then MIN_SUMMARIES[$j]="$num_val"; fi
+            elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                if [[ -z "${MIN_SUMMARIES[$j]}" ]] || (( $(printf "%.0f" "$value") < $(printf "%.0f" "${MIN_SUMMARIES[$j]:-999999}") )); then MIN_SUMMARIES[$j]="$value"; fi
             fi;;
         max)
-            if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || (( $(printf "%.0f" "$value") > $(printf "%.0f" "${MAX_SUMMARIES[$j]}") )); then MAX_SUMMARIES[$j]="$value"; fi
+            if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then
+                local num_val="${value%m}"
+                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || (( num_val > ${MAX_SUMMARIES[$j]:-0} )); then MAX_SUMMARIES[$j]="$num_val"; fi
+            elif [[ "$datatype" == "kmem" && "$value" =~ ^[0-9]+[KMG]$ ]]; then
+                local num_val="${value%[KMG]}"
+                local unit="${value: -1}"
+                if [[ "$unit" == "G" ]]; then num_val=$((num_val * 1000)); elif [[ "$unit" == "K" ]]; then num_val=$((num_val / 1000)); fi
+                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || (( num_val > ${MAX_SUMMARIES[$j]:-0} )); then MAX_SUMMARIES[$j]="$num_val"; fi
+            elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+                if [[ -z "${MAX_SUMMARIES[$j]}" ]] || (( $(printf "%.0f" "$value") > $(printf "%.0f" "${MAX_SUMMARIES[$j]:-0}") )); then MAX_SUMMARIES[$j]="$value"; fi
             fi;;
         count) if [[ -n "$value" && "$value" != "null" ]]; then COUNT_SUMMARIES[$j]=$(( ${COUNT_SUMMARIES[$j]:-0} + 1 )); fi;;
         unique) if [[ -n "$value" && "$value" != "null" ]]; then
@@ -629,13 +645,31 @@ render_table_border() {
             done
             if [[ -n "$element_width" && $element_width -gt 0 ]]; then
                 if [[ $i -eq $element_offset && $element_offset -gt 0 && $element_offset -lt $((total_table_width + 1)) ]]; then
-                    if [[ "$border_type" == "top" ]]; then
+                    local is_column_line=false
+                    for pos in "${column_positions[@]}"; do
+                        if [[ $((pos + 1)) -eq $i ]]; then
+                            is_column_line=true
+                            break
+                        fi
+                    done
+                    if [[ "$is_column_line" == "true" ]]; then
+                        char_to_print="${THEME[cross]}"
+                    elif [[ "$border_type" == "top" ]]; then
                         char_to_print="${THEME[b_junct]}"
                     else
                         char_to_print="${THEME[t_junct]}"
                     fi
                 elif [[ $i -eq $((element_right_edge + 1)) && $((element_right_edge + 1)) -lt $((total_table_width + 1)) ]]; then
-                    if [[ "$border_type" == "top" ]]; then
+                    local is_column_line=false
+                    for pos in "${column_positions[@]}"; do
+                        if [[ $((pos + 1)) -eq $i ]]; then
+                            is_column_line=true
+                            break
+                        fi
+                    done
+                    if [[ "$is_column_line" == "true" ]]; then
+                        char_to_print="${THEME[cross]}"
+                    elif [[ "$border_type" == "top" ]]; then
                         char_to_print="${THEME[b_junct]}"
                     else
                         char_to_print="${THEME[t_junct]}"
@@ -895,7 +929,13 @@ render_summaries_row() {
                         ;;
                     min)
                         summary_value="${MIN_SUMMARIES[$i]:-}"
-                        if [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
+                        if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
+                            local formatted_num=$(format_with_commas "$summary_value")
+                            summary_value="${formatted_num}m"
+                        elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
+                            local formatted_num=$(format_with_commas "$summary_value")
+                            summary_value="${formatted_num}M"
+                        elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
                             local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
                             summary_value=$(printf "%.${decimals}f" "$summary_value")
                         elif [[ -n "$format" ]]; then
@@ -904,7 +944,13 @@ render_summaries_row() {
                         ;;
                     max)
                         summary_value="${MAX_SUMMARIES[$i]:-}"
-                        if [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
+                        if [[ "$datatype" == "kcpu" && -n "$summary_value" ]]; then
+                            local formatted_num=$(format_with_commas "$summary_value")
+                            summary_value="${formatted_num}m"
+                        elif [[ "$datatype" == "kmem" && -n "$summary_value" ]]; then
+                            local formatted_num=$(format_with_commas "$summary_value")
+                            summary_value="${formatted_num}M"
+                        elif [[ "$datatype" == "float" && -n "$summary_value" && -n "${MAX_DECIMAL_PLACES[$i]}" ]]; then
                             local decimals=${MAX_DECIMAL_PLACES[$i]:-2}
                             summary_value=$(printf "%.${decimals}f" "$summary_value")
                         elif [[ -n "$format" ]]; then

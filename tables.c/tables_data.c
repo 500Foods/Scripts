@@ -33,19 +33,31 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
     size_t buffer_size = 0;
     size_t total_read = 0;
     size_t chunk_size = 1024;
+    extern int debug_mode;
+    
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Starting to load data from %s\n", data_file);
+    }
     
     fp = fopen(data_file, "r");
     if (fp == NULL) {
         fprintf(stderr, "Error: Cannot open data file %s\n", data_file);
         return 1;
     }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Data file %s opened successfully\n", data_file);
+    }
     
     // Read file content into buffer
-    buffer = malloc(chunk_size);
+    buffer_size = chunk_size;
+    buffer = malloc(buffer_size + 1); // Extra byte for null terminator
     if (buffer == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for buffer\n");
         fclose(fp);
         return 1;
+    }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Initial buffer allocated for reading data\n");
     }
     
     while (1) {
@@ -61,7 +73,7 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
             }
         }
         buffer_size += chunk_size;
-        char *new_buffer = realloc(buffer, buffer_size);
+        char *new_buffer = realloc(buffer, buffer_size + 1); // Extra byte for null terminator
         if (new_buffer == NULL) {
             fprintf(stderr, "Error: Memory reallocation failed for buffer\n");
             free(buffer);
@@ -82,6 +94,9 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
         fprintf(stderr, "Error: JSON parsing failed for %s: %s\n", data_file, error.text);
         return 1;
     }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: JSON data parsed successfully from %s\n", data_file);
+    }
     
     if (!json_is_array(root)) {
         fprintf(stderr, "Error: Data JSON root must be an array\n");
@@ -98,6 +113,9 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
         json_decref(root);
         return 1;
     }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Allocated memory for %d data rows\n", data->row_count);
+    }
     
     // Allocate summaries array
     data->summaries = malloc(config->column_count * sizeof(SummaryStats));
@@ -106,6 +124,9 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
         free(data->rows);
         json_decref(root);
         return 1;
+    }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Allocated memory for summaries of %d columns\n", config->column_count);
     }
     
     // Initialize summaries
@@ -150,6 +171,9 @@ int prepare_data(const char *data_file, TableConfig *config, TableData *data) {
     }
     
     json_decref(root);
+    if (debug_mode) {
+        fprintf(stderr, "Debug: JSON root object freed\n");
+    }
     return 0;
 }
 
@@ -174,6 +198,8 @@ void sort_data(TableConfig *config, TableData *data) {
     
     // TODO: Implement sorting logic
     // For now, just a placeholder to indicate sorting will be done here
+    // Note: 'data' parameter is currently unused but will be needed for sorting implementation
+    (void)data; // Suppress unused parameter warning
 }
 
 /*
@@ -227,6 +253,7 @@ static int count_decimal_places(const char *value) {
  * Update summary statistics for a column
  */
 void update_summaries(int col_idx, const char *value, DataType data_type, SummaryType summary_type, SummaryStats *stats) {
+    extern int debug_mode;
     if (value == NULL || strcmp(value, "null") == 0) {
         return;
     }
@@ -243,6 +270,10 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
         case SUMMARY_SUM:
             if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
                 char *num_part = strdup(value);
+                if (num_part == NULL) {
+                    fprintf(stderr, "Error: Memory allocation failed for num_part\n");
+                    break;
+                }
                 num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
                 stats->sum += atof(num_part);
                 free(num_part);
@@ -250,16 +281,28 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
                 // TODO: Handle different memory units
                 if (strstr(value, "M") != NULL || strstr(value, "Mi") != NULL) {
                     char *num_part = strdup(value);
+                    if (num_part == NULL) {
+                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
+                        break;
+                    }
                     num_part[strlen(num_part) - (strstr(value, "Mi") ? 2 : 1)] = '\0';
                     stats->sum += atof(num_part);
                     free(num_part);
                 } else if (strstr(value, "G") != NULL || strstr(value, "Gi") != NULL) {
                     char *num_part = strdup(value);
+                    if (num_part == NULL) {
+                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
+                        break;
+                    }
                     num_part[strlen(num_part) - (strstr(value, "Gi") ? 2 : 1)] = '\0';
                     stats->sum += atof(num_part) * 1000;
                     free(num_part);
                 } else if (strstr(value, "K") != NULL || strstr(value, "Ki") != NULL) {
                     char *num_part = strdup(value);
+                    if (num_part == NULL) {
+                        fprintf(stderr, "Error: Memory allocation failed for num_part\n");
+                        break;
+                    }
                     num_part[strlen(num_part) - (strstr(value, "Ki") ? 2 : 1)] = '\0';
                     stats->sum += atof(num_part) / 1000.0;
                     free(num_part);
@@ -277,6 +320,37 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
                 } else if (num_val < stats->min) {
                     stats->min = num_val;
                 }
+            } else if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
+                char *num_part = strdup(value);
+                if (num_part) {
+                    num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
+                    double num_val = atof(num_part);
+                    free(num_part);
+                    if (!stats->min_initialized) {
+                        stats->min = num_val;
+                        stats->min_initialized = 1;
+                    } else if (num_val < stats->min) {
+                        stats->min = num_val;
+                    }
+                }
+            } else if (data_type == DATA_KMEM) {
+                char *num_part = strdup(value);
+                if (num_part) {
+                    char *unit = strstr(num_part, "M");
+                    if (unit) {
+                        *unit = '\0';
+                        double num_val = atof(num_part);
+                        free(num_part);
+                        if (!stats->min_initialized) {
+                            stats->min = num_val;
+                            stats->min_initialized = 1;
+                        } else if (num_val < stats->min) {
+                            stats->min = num_val;
+                        }
+                    } else {
+                        free(num_part);
+                    }
+                }
             }
             break;
         case SUMMARY_MAX:
@@ -288,6 +362,37 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
                 } else if (num_val > stats->max) {
                     stats->max = num_val;
                 }
+            } else if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
+                char *num_part = strdup(value);
+                if (num_part) {
+                    num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
+                    double num_val = atof(num_part);
+                    free(num_part);
+                    if (!stats->max_initialized) {
+                        stats->max = num_val;
+                        stats->max_initialized = 1;
+                    } else if (num_val > stats->max) {
+                        stats->max = num_val;
+                    }
+                }
+            } else if (data_type == DATA_KMEM) {
+                char *num_part = strdup(value);
+                if (num_part) {
+                    char *unit = strstr(num_part, "M");
+                    if (unit) {
+                        *unit = '\0';
+                        double num_val = atof(num_part);
+                        free(num_part);
+                        if (!stats->max_initialized) {
+                            stats->max = num_val;
+                            stats->max_initialized = 1;
+                        } else if (num_val > stats->max) {
+                            stats->max = num_val;
+                        }
+                    } else {
+                        free(num_part);
+                    }
+                }
             }
             break;
         case SUMMARY_COUNT:
@@ -297,16 +402,30 @@ void update_summaries(int col_idx, const char *value, DataType data_type, Summar
             // Check if value is already in unique_values
             for (int i = 0; i < stats->unique_count; i++) {
                 if (strcmp(stats->unique_values[i], value) == 0) {
+                    if (debug_mode) {
+                        fprintf(stderr, "Debug: Value '%s' already in unique_values for column %d\n", value, col_idx);
+                    }
                     return; // Already exists
                 }
             }
             // Add new unique value
-            stats->unique_values = realloc(stats->unique_values, (stats->unique_count + 1) * sizeof(char *));
-            if (stats->unique_values == NULL) {
+            if (debug_mode) {
+                fprintf(stderr, "Debug: Adding new unique value '%s' for column %d, new count will be %d\n", value, col_idx, stats->unique_count + 1);
+            }
+            char **new_unique_values = realloc(stats->unique_values, (stats->unique_count + 1) * sizeof(char *));
+            if (new_unique_values == NULL) {
                 fprintf(stderr, "Error: Memory allocation failed for unique values\n");
                 return;
             }
+            stats->unique_values = new_unique_values;
             stats->unique_values[stats->unique_count] = strdup_safe(value);
+            if (stats->unique_values[stats->unique_count] == NULL) {
+                fprintf(stderr, "Error: Memory allocation failed for unique value string\n");
+            } else {
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Successfully added unique value '%s' at index %d for column %d\n", value, stats->unique_count, col_idx);
+                }
+            }
             stats->unique_count++;
             break;
         case SUMMARY_AVG:

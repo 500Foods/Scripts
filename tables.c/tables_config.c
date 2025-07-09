@@ -125,26 +125,46 @@ int parse_layout_file(const char *filename, TableConfig *config) {
     size_t buffer_size = 0;
     size_t total_read = 0;
     size_t chunk_size = 1024;
+    extern int debug_mode;
+    
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Starting to parse layout file %s\n", filename);
+    }
     
     fp = fopen(filename, "r");
     if (fp == NULL) {
         fprintf(stderr, "Error: Cannot open layout file %s\n", filename);
         return 1;
     }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Layout file %s opened successfully\n", filename);
+    }
     
     // Read file content into buffer
-    buffer = malloc(chunk_size);
+    buffer = malloc(chunk_size + 1); // Extra byte for null terminator
     if (buffer == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for buffer\n");
         fclose(fp);
         return 1;
     }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Allocated initial buffer of size %zu for layout file\n", chunk_size + 1);
+    }
+    buffer_size = chunk_size;
     
     while (1) {
         size_t bytes_read = fread(buffer + total_read, 1, chunk_size, fp);
         total_read += bytes_read;
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Read %zu bytes, total read now %zu\n", bytes_read, total_read);
+        }
         if (bytes_read < chunk_size) {
-            if (feof(fp)) break;
+            if (feof(fp)) {
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: End of file reached\n");
+                }
+                break;
+            }
             if (ferror(fp)) {
                 fprintf(stderr, "Error: Reading layout file %s\n", filename);
                 free(buffer);
@@ -153,12 +173,15 @@ int parse_layout_file(const char *filename, TableConfig *config) {
             }
         }
         buffer_size += chunk_size;
-        char *new_buffer = realloc(buffer, buffer_size);
+        char *new_buffer = realloc(buffer, buffer_size + 1); // Extra byte for null terminator
         if (new_buffer == NULL) {
             fprintf(stderr, "Error: Memory reallocation failed for buffer\n");
             free(buffer);
             fclose(fp);
             return 1;
+        }
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Reallocated buffer to size %zu for layout file\n", buffer_size + 1);
         }
         buffer = new_buffer;
     }
@@ -166,13 +189,25 @@ int parse_layout_file(const char *filename, TableConfig *config) {
     
     // Null-terminate the buffer
     buffer[total_read] = '\0';
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Read %zu bytes from layout file, buffer null-terminated\n", total_read);
+    }
     
     // Parse JSON
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Starting JSON parsing for layout file\n");
+    }
     root = json_loads(buffer, 0, &error);
+    if (debug_mode) {
+        fprintf(stderr, "Debug: JSON parsing completed, freeing buffer\n");
+    }
     free(buffer);
     if (root == NULL) {
         fprintf(stderr, "Error: JSON parsing failed for %s: %s\n", filename, error.text);
         return 1;
+    }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: JSON layout parsed successfully from %s\n", filename);
     }
     
     // Initialize config structure
@@ -181,18 +216,33 @@ int parse_layout_file(const char *filename, TableConfig *config) {
     // Parse theme name
     json_t *theme_val = json_object_get(root, "theme");
     config->theme_name = strdup_safe(json_string_value(theme_val) ? json_string_value(theme_val) : "Red");
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Parsed theme_name as '%s'\n", config->theme_name ? config->theme_name : "NULL");
+    }
     
     // Parse title and position
     json_t *title_val = json_object_get(root, "title");
     config->title = strdup_safe(json_string_value(title_val));
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Parsed title as '%s'\n", config->title ? config->title : "NULL");
+    }
     json_t *title_pos_val = json_object_get(root, "title_position");
     config->title_pos = parse_position(json_string_value(title_pos_val));
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Parsed title_position as %d\n", config->title_pos);
+    }
     
     // Parse footer and position
     json_t *footer_val = json_object_get(root, "footer");
     config->footer = strdup_safe(json_string_value(footer_val));
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Parsed footer as '%s'\n", config->footer ? config->footer : "NULL");
+    }
     json_t *footer_pos_val = json_object_get(root, "footer_position");
     config->footer_pos = parse_position(json_string_value(footer_pos_val));
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Parsed footer_position as %d\n", config->footer_pos);
+    }
     
     // Parse columns array
     json_t *columns_array = json_object_get(root, "columns");
@@ -207,6 +257,9 @@ int parse_layout_file(const char *filename, TableConfig *config) {
     if (config->column_count > MAX_COLUMNS) {
         fprintf(stderr, "Warning: Too many columns, truncating to %d\n", MAX_COLUMNS);
         config->column_count = MAX_COLUMNS;
+    }
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Configured %d columns for layout\n", config->column_count);
     }
     
     config->columns = malloc(config->column_count * sizeof(ColumnConfig));
@@ -238,6 +291,12 @@ int parse_layout_file(const char *filename, TableConfig *config) {
         if (key_str == NULL || strlen(key_str) == 0) {
             // Derive key from header (lowercase, replace non-alphanumeric with underscore)
             char *derived_key = strdup(col->header);
+            if (derived_key == NULL) {
+                fprintf(stderr, "Error: Memory allocation failed for derived key\n");
+                json_decref(root);
+                free_table_config(config);
+                return 1;
+            }
             for (char *p = derived_key; *p; p++) {
                 if (!isalnum(*p)) *p = '_';
                 else *p = tolower(*p);
@@ -323,6 +382,9 @@ int parse_layout_file(const char *filename, TableConfig *config) {
     }
     
     json_decref(root);
+    if (debug_mode) {
+        fprintf(stderr, "Debug: JSON layout root object freed\n");
+    }
     return 0;
 }
 
@@ -330,30 +392,95 @@ int parse_layout_file(const char *filename, TableConfig *config) {
  * Free memory allocated for TableConfig structure
  */
 void free_table_config(TableConfig *config) {
-    if (config->theme_name) free(config->theme_name);
-    if (config->title) free(config->title);
-    if (config->footer) free(config->footer);
+    extern int debug_mode;
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Starting to free TableConfig structure\n");
+    }
+    if (config->theme_name) {
+        if (debug_mode) {
+            fprintf(stderr, "Debug: About to free theme_name at address %p\n", (void*)config->theme_name);
+        }
+        free(config->theme_name);
+        config->theme_name = NULL; // Set to NULL after freeing to prevent double-free
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Freed theme_name\n");
+        }
+    }
+    if (config->title) {
+        if (debug_mode) {
+            fprintf(stderr, "Debug: About to free title at address %p\n", (void*)config->title);
+        }
+        free(config->title);
+        config->title = NULL; // Set to NULL after freeing to prevent double-free
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Freed title\n");
+        }
+    }
+    if (config->footer) {
+        if (debug_mode) {
+            fprintf(stderr, "Debug: About to free footer at address %p\n", (void*)config->footer);
+        }
+        free(config->footer);
+        config->footer = NULL; // Set to NULL after freeing to prevent double-free
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Freed footer\n");
+        }
+    }
     
     if (config->columns) {
         for (int i = 0; i < config->column_count; i++) {
             ColumnConfig *col = &config->columns[i];
-            if (col->header) free(col->header);
-            if (col->key) free(col->key);
-            if (col->format) free(col->format);
-            if (col->wrap_char) free(col->wrap_char);
+            if (col->header) {
+                free(col->header);
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Freed header for column %d\n", i);
+                }
+            }
+            if (col->key) {
+                free(col->key);
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Freed key for column %d\n", i);
+                }
+            }
+            if (col->format) {
+                free(col->format);
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Freed format for column %d\n", i);
+                }
+            }
+            if (col->wrap_char) {
+                free(col->wrap_char);
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Freed wrap_char for column %d\n", i);
+                }
+            }
         }
         free(config->columns);
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Freed columns array\n");
+        }
     }
     
     if (config->sorts) {
         for (int i = 0; i < config->sort_count; i++) {
             SortConfig *sort = &config->sorts[i];
-            if (sort->key) free(sort->key);
+            if (sort->key) {
+                free(sort->key);
+                if (debug_mode) {
+                    fprintf(stderr, "Debug: Freed key for sort %d\n", i);
+                }
+            }
         }
         free(config->sorts);
+        if (debug_mode) {
+            fprintf(stderr, "Debug: Freed sorts array\n");
+        }
     }
     
     // Reset counts
     config->column_count = 0;
     config->sort_count = 0;
+    if (debug_mode) {
+        fprintf(stderr, "Debug: Completed freeing TableConfig structure\n");
+    }
 }

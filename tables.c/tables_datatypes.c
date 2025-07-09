@@ -12,7 +12,9 @@
 
 /*
  * Helper function to duplicate a string, returning NULL if input is NULL
+ * Note: Currently unused but kept for future extensibility
  */
+static char *strdup_safe(const char *str) __attribute__((unused));
 static char *strdup_safe(const char *str) {
     if (str == NULL) return NULL;
     char *dup = strdup(str);
@@ -73,6 +75,12 @@ char *format_text(const char *value, const char *format, int string_limit, int w
     if (value == NULL || strcmp(value, "null") == 0 || strlen(value) == 0) {
         return strdup("");
     }
+    // Suppress unused parameter warnings; these will be used in future implementations
+    (void)format;
+    (void)string_limit;
+    (void)wrap_mode;
+    (void)wrap_char;
+    (void)justification;
     
     if (string_limit > 0 && strlen(value) > (size_t)string_limit) {
         if (wrap_mode == WRAP_WRAP && wrap_char != NULL && strlen(wrap_char) > 0) {
@@ -141,6 +149,12 @@ char *format_number(const char *value, const char *format, int string_limit, int
     if (value == NULL || strcmp(value, "null") == 0 || strcmp(value, "0") == 0) {
         return strdup("");
     }
+    // Suppress unused parameter warnings; these will be used in future implementations
+    (void)format;
+    (void)string_limit;
+    (void)wrap_mode;
+    (void)wrap_char;
+    (void)justification;
     
     if (format != NULL && strlen(format) > 0) {
         char buffer[256];
@@ -163,6 +177,12 @@ char *format_num(const char *value, const char *format, int string_limit, int wr
     if (value == NULL || strcmp(value, "null") == 0 || strcmp(value, "0") == 0) {
         return strdup("");
     }
+    // Suppress unused parameter warnings; these will be used in future implementations
+    (void)format;
+    (void)string_limit;
+    (void)wrap_mode;
+    (void)wrap_char;
+    (void)justification;
     
     if (format != NULL && strlen(format) > 0) {
         char buffer[256];
@@ -211,14 +231,26 @@ char *format_kcpu(const char *value, const char *format, int string_limit, int w
     if (strcmp(value, "0") == 0 || strcmp(value, "0m") == 0) {
         return strdup("0m");
     }
+    // Suppress unused parameter warnings; these will be used in future implementations
+    (void)format;
+    (void)string_limit;
+    (void)wrap_mode;
+    (void)wrap_char;
+    (void)justification;
     
     if (strstr(value, "m") != NULL) {
         char *num_part = strdup(value);
-        if (num_part == NULL) return strdup("");
+        if (num_part == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for num_part in format_kcpu\n");
+            return strdup("");
+        }
         num_part[strlen(num_part) - 1] = '\0'; // Remove 'm'
         char *formatted = format_with_commas(num_part);
         free(num_part);
-        if (formatted == NULL) return strdup("");
+        if (formatted == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for formatted in format_kcpu\n");
+            return strdup("");
+        }
         char *result = malloc(strlen(formatted) + 2);
         if (result == NULL) {
             free(formatted);
@@ -282,6 +314,12 @@ char *format_kmem(const char *value, const char *format, int string_limit, int w
     if (value == NULL || strcmp(value, "null") == 0) {
         return strdup("");
     }
+    // Suppress unused parameter warnings; these will be used in future implementations
+    (void)format;
+    (void)string_limit;
+    (void)wrap_mode;
+    (void)wrap_char;
+    (void)justification;
     if (strstr(value, "0M") != NULL || strstr(value, "0G") != NULL || strstr(value, "0K") != NULL ||
         strstr(value, "0Mi") != NULL || strstr(value, "0Gi") != NULL || strstr(value, "0Ki") != NULL) {
         return strdup("0M");
@@ -289,11 +327,17 @@ char *format_kmem(const char *value, const char *format, int string_limit, int w
     
     if (strstr(value, "Mi") != NULL) {
         char *num_part = strdup(value);
-        if (num_part == NULL) return strdup("");
+        if (num_part == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for num_part in format_kmem\n");
+            return strdup("");
+        }
         num_part[strlen(num_part) - 2] = '\0'; // Remove 'Mi'
         char *formatted = format_with_commas(num_part);
         free(num_part);
-        if (formatted == NULL) return strdup("");
+        if (formatted == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for formatted in format_kmem\n");
+            return strdup("");
+        }
         char *result = malloc(strlen(formatted) + 2);
         if (result == NULL) {
             free(formatted);
@@ -305,11 +349,17 @@ char *format_kmem(const char *value, const char *format, int string_limit, int w
         return result;
     } else if (strstr(value, "Gi") != NULL) {
         char *num_part = strdup(value);
-        if (num_part == NULL) return strdup("");
+        if (num_part == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for num_part in format_kmem\n");
+            return strdup("");
+        }
         num_part[strlen(num_part) - 2] = '\0'; // Remove 'Gi'
         char *formatted = format_with_commas(num_part);
         free(num_part);
-        if (formatted == NULL) return strdup("");
+        if (formatted == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for formatted in format_kmem\n");
+            return strdup("");
+        }
         char *result = malloc(strlen(formatted) + 2);
         if (result == NULL) {
             free(formatted);
@@ -321,11 +371,17 @@ char *format_kmem(const char *value, const char *format, int string_limit, int w
         return result;
     } else if (strstr(value, "Ki") != NULL) {
         char *num_part = strdup(value);
-        if (num_part == NULL) return strdup("");
+        if (num_part == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for num_part in format_kmem\n");
+            return strdup("");
+        }
         num_part[strlen(num_part) - 2] = '\0'; // Remove 'Ki'
         char *formatted = format_with_commas(num_part);
         free(num_part);
-        if (formatted == NULL) return strdup("");
+        if (formatted == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for formatted in format_kmem\n");
+            return strdup("");
+        }
         char *result = malloc(strlen(formatted) + 2);
         if (result == NULL) {
             free(formatted);
@@ -337,12 +393,18 @@ char *format_kmem(const char *value, const char *format, int string_limit, int w
         return result;
     } else if (strstr(value, "M") != NULL || strstr(value, "G") != NULL || strstr(value, "K") != NULL) {
         char *num_part = strdup(value);
-        if (num_part == NULL) return strdup("");
+        if (num_part == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for num_part in format_kmem\n");
+            return strdup("");
+        }
         char unit = num_part[strlen(num_part) - 1];
         num_part[strlen(num_part) - 1] = '\0'; // Remove unit
         char *formatted = format_with_commas(num_part);
         free(num_part);
-        if (formatted == NULL) return strdup("");
+        if (formatted == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for formatted in format_kmem\n");
+            return strdup("");
+        }
         char *result = malloc(strlen(formatted) + 2);
         if (result == NULL) {
             free(formatted);

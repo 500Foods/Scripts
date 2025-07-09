@@ -8,13 +8,13 @@
 #include <string.h>
 #include "tables_themes.h"
 
-/* ANSI color code constants */
-static const char *RED = "\033[0;31m";
-static const char *BLUE = "\033[0;34m";
-static const char *GREEN = "\033[0;32m";
-static const char *CYAN = "\033[0;36m";
-static const char *BRIGHT_WHITE = "\033[1;37m";
-static const char *DEFAULT_COLOR = "\033[0m";
+/* ANSI color code constants - commented out to suppress unused variable warnings */
+/* static const char *RED = "\033[0;31m"; */
+/* static const char *BLUE = "\033[0;34m"; */
+/* static const char *GREEN = "\033[0;32m"; */
+/* static const char *CYAN = "\033[0;36m"; */
+/* static const char *BRIGHT_WHITE = "\033[1;37m"; */
+/* static const char *DEFAULT_COLOR = "\033[0m"; */
 
 /* Theme definitions */
 static ThemeConfig RED_THEME = {
@@ -83,4 +83,5 @@ void get_theme(TableConfig *config) {
 void free_theme(ThemeConfig *theme) {
     // No dynamically allocated memory in ThemeConfig currently
     // This function is provided for future extensibility
+    (void)theme; // Suppress unused parameter warning
 }
