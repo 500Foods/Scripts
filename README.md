@@ -51,12 +51,12 @@ These tools help manage GitHub repositories:
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2025-07-09 15:20:56 UTC
+Last updated at 2025-07-09 15:34:58 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Bourne Shell                    36           1338           1227          14838
-Markdown                        17           1168              4           3503
+Markdown                        17           1168              4           3502
 C                               14            305            356           2885
 C/C++ Header                    13             79            123            233
 XML                              4              0              0            124
@@ -66,11 +66,10 @@ SQL                              1              6              5             38
 make                             1              4              4             11
 JSON                             1              0              0              2
 -------------------------------------------------------------------------------
-SUM:                            94           2972           1746          21818
+SUM:                            94           2972           1746          21817
 -------------------------------------------------------------------------------
-8 Files were skipped (duplicate, binary, or without source code):
+7 Files were skipped (duplicate, binary, or without source code):
   gitignore: 2
-  1cd: 1
   gitattributes: 1
   license: 1
   sh: 1
