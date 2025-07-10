@@ -118,53 +118,27 @@ format_float() {
         echo "$value"
     fi
 }
-format_kcpu() {
-    local value="$1" format="$2"
+format_k_unit() {
+    local value="$1" format="$2" unit_type="$3"
     [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
-    [[ "$value" == "0" || "$value" == "0m" ]] && { echo "0m"; return; }
-    if [[ "$value" =~ ^[0-9]+m$ ]]; then
-        local num_part="${value%m}"
-        local formatted_num
-        formatted_num=$(format_with_commas "$num_part")
-        echo "${formatted_num}m"
-    elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        local int_value=${value%.*}
-        [[ "$int_value" == "$value" ]] && int_value=$value
-        local num_value=$((int_value * 1000))
-        printf "%sm" "$(format_with_commas "$num_value")"
+    if [[ "$unit_type" == "cpu" ]]; then
+        [[ "$value" == "0" || "$value" == "0m" ]] && { echo "0m"; return; }
+        if [[ "$value" =~ ^[0-9]+m$ ]]; then
+            echo "$(format_with_commas "${value%m}")m"
+        elif [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            printf "%sm" "$(format_with_commas "$((${value%.*} * 1000))")"
+        else echo "$value"; fi
     else
-        echo "$value"
+        [[ "$value" =~ ^0[MKG]$ || "$value" == "0Mi" || "$value" == "0Gi" || "$value" == "0Ki" ]] && { echo "0M"; return; }
+        if [[ "$value" =~ ^[0-9]+[KMG]$ ]]; then
+            echo "$(format_with_commas "${value%[KMG]}")${value: -1}"
+        elif [[ "$value" =~ ^[0-9]+[MGK]i$ ]]; then
+            echo "$(format_with_commas "${value%?i}")${value: -2:1}"
+        else echo "$value"; fi
     fi
 }
-format_kmem() {
-    local value="$1" format="$2"
-    [[ -z "$value" || "$value" == "null" ]] && { echo ""; return; }
-    [[ "$value" =~ ^0[MKG]$ || "$value" == "0Mi" || "$value" == "0Gi" || "$value" == "0Ki" ]] && { echo "0M"; return; }
-    if [[ "$value" =~ ^[0-9]+[KMG]$ ]]; then
-        local num_part="${value%[KMG]}"
-        local unit="${value: -1}"
-        local formatted_num
-        formatted_num=$(format_with_commas "$num_part")
-        echo "${formatted_num}${unit}"
-    elif [[ "$value" =~ ^[0-9]+Mi$ ]]; then
-        local num_part="${value%Mi}"
-        local formatted_num
-        formatted_num=$(format_with_commas "$num_part")
-        echo "${formatted_num}M"
-    elif [[ "$value" =~ ^[0-9]+Gi$ ]]; then
-        local num_part="${value%Gi}"
-        local formatted_num
-        formatted_num=$(format_with_commas "$num_part")
-        echo "${formatted_num}G"
-    elif [[ "$value" =~ ^[0-9]+Ki$ ]]; then
-        local num_part="${value%Ki}"
-        local formatted_num
-        formatted_num=$(format_with_commas "$num_part")
-        echo "${formatted_num}K"
-    else
-        echo "$value"
-    fi
-}
+format_kcpu() { format_k_unit "$1" "$2" "cpu"; }
+format_kmem() { format_k_unit "$1" "$2" "mem"; }
 format_display_value() {
     local value="$1" null_value="$2" zero_value="$3" datatype="$4" format="$5" string_limit="$6" wrap_mode="$7" wrap_char="$8" justification="$9"
     local validate_fn="${DATATYPE_HANDLERS[${datatype}_validate]}" format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
@@ -186,12 +160,8 @@ format_display_value() {
     fi
     echo "$display_value"
 }
-declare -gx TABLE_TITLE="" TITLE_WIDTH=0 TITLE_POSITION="none"
-declare -gx TABLE_FOOTER="" FOOTER_WIDTH=0 FOOTER_POSITION="none"
-declare -ax HEADERS=() KEYS=() JUSTIFICATIONS=() DATATYPES=() NULL_VALUES=() ZERO_VALUES=()
-declare -ax FORMATS=() SUMMARIES=() BREAKS=() STRING_LIMITS=() WRAP_MODES=() WRAP_CHARS=()
-declare -ax PADDINGS=() WIDTHS=() SORT_KEYS=() SORT_DIRECTIONS=() SORT_PRIORITIES=()
-declare -ax IS_WIDTH_SPECIFIED=() VISIBLES=()
+declare -gx TABLE_TITLE="" TITLE_WIDTH=0 TITLE_POSITION="none" TABLE_FOOTER="" FOOTER_WIDTH=0 FOOTER_POSITION="none"
+declare -ax HEADERS=() KEYS=() JUSTIFICATIONS=() DATATYPES=() NULL_VALUES=() ZERO_VALUES=() FORMATS=() SUMMARIES=() BREAKS=() STRING_LIMITS=() WRAP_MODES=() WRAP_CHARS=() PADDINGS=() WIDTHS=() SORT_KEYS=() SORT_DIRECTIONS=() SORT_PRIORITIES=() IS_WIDTH_SPECIFIED=() VISIBLES=()
 validate_input_files() {
     local layout_file="$1" data_file="$2"
     [[ ! -s "$layout_file" || ! -s "$data_file" ]] && echo -e "${THEME[border_color]}Error: Layout or data JSON file empty/missing${THEME[text_color]}" >&2 && return 1
@@ -235,22 +205,10 @@ parse_column_config() {
         WRAP_MODES[i]=$(jq -r '.wrap_mode // "clip"' <<<"$col_json" | tr '[:upper:]' '[:lower:]')
         WRAP_CHARS[i]=$(jq -r '.wrap_char // ""' <<<"$col_json")
         PADDINGS[i]=$(jq -r '.padding // '"$DEFAULT_PADDING" <<<"$col_json")
-        local visible_raw
+        local visible_raw visible_key_check
         visible_raw=$(jq -r '.visible // true' <<<"$col_json")
-        local visible_key_check
         visible_key_check=$(jq -r 'has("visible")' <<<"$col_json")
-        if [[ "$visible_key_check" == "true" ]]; then
-            local visible_value
-            visible_value=$(jq -r '.visible' <<<"$col_json")
-            VISIBLES[i]="$visible_value"
-        else
-            VISIBLES[i]="$visible_raw"
-        fi
-        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
-    done
-    for ((i=0; i<COLUMN_COUNT; i++)); do
-        local col_json
-        col_json=$(jq -c ".[$i]" <<<"$columns_json")
+        VISIBLES[i]=$(if [[ "$visible_key_check" == "true" ]]; then jq -r '.visible' <<<"$col_json"; else echo "$visible_raw"; fi)
         local specified_width
         specified_width=$(jq -r '.width // 0' <<<"$col_json")
         if [[ $specified_width -gt 0 ]]; then
@@ -258,6 +216,7 @@ parse_column_config() {
         else
             WIDTHS[i]=$((${#HEADERS[i]} + (2 * PADDINGS[i]))); IS_WIDTH_SPECIFIED[i]="false"
         fi
+        validate_column_config "$i" "${HEADERS[$i]}" "${JUSTIFICATIONS[$i]}" "${DATATYPES[$i]}" "${SUMMARIES[$i]}"
     done
 }
 validate_column_config() {
@@ -283,11 +242,8 @@ parse_sort_config() {
         [[ "${SORT_DIRECTIONS[$i]}" != "asc" && "${SORT_DIRECTIONS[$i]}" != "desc" ]] && echo -e "${THEME[border_color]}Warning: Invalid sort direction '${SORT_DIRECTIONS[$i]}' for key ${SORT_KEYS[$i]}, using 'asc'${THEME[text_color]}" >&2 && SORT_DIRECTIONS[i]="asc"
     done
 }
-declare -a ROW_JSONS=()
-declare -A SUM_SUMMARIES=() COUNT_SUMMARIES=() MIN_SUMMARIES=() MAX_SUMMARIES=()
-declare -A UNIQUE_VALUES=() AVG_SUMMARIES=() AVG_COUNTS=() MAX_DECIMAL_PLACES=()
-declare -a IS_WIDTH_SPECIFIED=()
-declare -a DATA_ROWS=()
+declare -a ROW_JSONS=() DATA_ROWS=()
+declare -A SUM_SUMMARIES=() COUNT_SUMMARIES=() MIN_SUMMARIES=() MAX_SUMMARIES=() UNIQUE_VALUES=() AVG_SUMMARIES=() AVG_COUNTS=() MAX_DECIMAL_PLACES=()
 initialize_summaries() {
     SUM_SUMMARIES=(); COUNT_SUMMARIES=(); MIN_SUMMARIES=(); MAX_SUMMARIES=()
     UNIQUE_VALUES=(); AVG_SUMMARIES=(); AVG_COUNTS=(); MAX_DECIMAL_PLACES=()
@@ -640,6 +596,14 @@ render_table_element() {
         echo -ne "${THEME[br_corner]}${THEME[text_color]}\n"
     fi
 }
+get_border_chars() {
+    local border_type="$1"
+    if [[ "$border_type" == "top" ]]; then
+        echo "${THEME[tl_corner]} ${THEME[tr_corner]} ${THEME[t_junct]}"
+    else
+        echo "${THEME[bl_corner]} ${THEME[br_corner]} ${THEME[b_junct]}"
+    fi
+}
 render_table_border() {
     local border_type="$1" total_table_width="$2" element_offset="$3" element_right_edge="$4" element_width="$5"
     local column_widths_sum=0 column_positions=()
@@ -654,84 +618,29 @@ render_table_border() {
         fi
     done
     local max_width=$((total_table_width + 2))
-    if [[ -n "$element_width" && $element_width -gt 0 ]]; then
-        local adjusted_element_width=$((element_width + 2))
-        [[ $adjusted_element_width -gt $max_width ]] && max_width=$adjusted_element_width
-    fi
+    [[ -n "$element_width" && $element_width -gt 0 && $((element_width + 2)) -gt $max_width ]] && max_width=$((element_width + 2))
+    read -r left_char right_char junction_char <<< "$(get_border_chars "$border_type")"
+    [[ -n "$element_width" && $element_width -gt 0 && $element_offset -eq 0 ]] && left_char="${THEME[l_junct]}"
     local border_string=""
-    local left_char right_char junction_char
-    if [[ "$border_type" == "top" ]]; then
-        left_char="${THEME[tl_corner]}"
-        right_char="${THEME[tr_corner]}"
-        junction_char="${THEME[t_junct]}"
-    else
-        left_char="${THEME[bl_corner]}"
-        right_char="${THEME[br_corner]}"
-        junction_char="${THEME[b_junct]}"
-    fi
-    if [[ -n "$element_width" && $element_width -gt 0 && $element_offset -eq 0 ]]; then
-        left_char="${THEME[l_junct]}"
-    fi
     for ((i=0; i<max_width; i++)); do
         local char_to_print="${THEME[h_line]}"
-        if [[ $i -eq 0 ]]; then
-            char_to_print="$left_char"
+        if [[ $i -eq 0 ]]; then char_to_print="$left_char"
         elif [[ $i -eq $((max_width - 1)) ]]; then
             if [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -gt $total_table_width ]]; then
-                if [[ "$border_type" == "top" ]]; then
-                    char_to_print="${THEME[br_corner]}"
-                else
-                    char_to_print="${THEME[tr_corner]}"
-                fi
+                char_to_print=$(if [[ "$border_type" == "top" ]]; then echo "${THEME[br_corner]}"; else echo "${THEME[tr_corner]}"; fi)
             elif [[ -n "$element_width" && $element_width -gt 0 && $element_right_edge -eq $total_table_width ]]; then
                 char_to_print="${THEME[r_junct]}"
-            else
-                char_to_print="$right_char"
-            fi
+            else char_to_print="$right_char"; fi
         else
-            for pos in "${column_positions[@]}"; do
-                if [[ $((pos + 1)) -eq $i ]]; then
-                    char_to_print="$junction_char"
-                    break
-                fi
-            done
+            for pos in "${column_positions[@]}"; do [[ $((pos + 1)) -eq $i ]] && char_to_print="$junction_char" && break; done
             if [[ -n "$element_width" && $element_width -gt 0 ]]; then
-                if [[ $i -eq $element_offset && $element_offset -gt 0 && $element_offset -lt $((total_table_width + 1)) ]]; then
+                if [[ $i -eq $element_offset && $element_offset -gt 0 && $element_offset -lt $((total_table_width + 1)) ]] || [[ $i -eq $((element_right_edge + 1)) && $((element_right_edge + 1)) -lt $((total_table_width + 1)) ]]; then
                     local is_column_line=false
-                    for pos in "${column_positions[@]}"; do
-                        if [[ $((pos + 1)) -eq $i ]]; then
-                            is_column_line=true
-                            break
-                        fi
-                    done
-                    if [[ "$is_column_line" == "true" ]]; then
-                        char_to_print="${THEME[cross]}"
-                    elif [[ "$border_type" == "top" ]]; then
-                        char_to_print="${THEME[b_junct]}"
-                    else
-                        char_to_print="${THEME[t_junct]}"
-                    fi
-                elif [[ $i -eq $((element_right_edge + 1)) && $((element_right_edge + 1)) -lt $((total_table_width + 1)) ]]; then
-                    local is_column_line=false
-                    for pos in "${column_positions[@]}"; do
-                        if [[ $((pos + 1)) -eq $i ]]; then
-                            is_column_line=true
-                            break
-                        fi
-                    done
-                    if [[ "$is_column_line" == "true" ]]; then
-                        char_to_print="${THEME[cross]}"
-                    elif [[ "$border_type" == "top" ]]; then
-                        char_to_print="${THEME[b_junct]}"
-                    else
-                        char_to_print="${THEME[t_junct]}"
-                    fi
+                    for pos in "${column_positions[@]}"; do [[ $((pos + 1)) -eq $i ]] && is_column_line=true && break; done
+                    if [[ "$is_column_line" == "true" ]]; then char_to_print="${THEME[cross]}"
+                    else char_to_print=$(if [[ "$border_type" == "top" ]]; then echo "${THEME[b_junct]}"; else echo "${THEME[t_junct]}"; fi); fi
                 elif [[ $i -eq $((total_table_width + 1)) && $i -lt $((max_width - 1)) && $element_right_edge -gt $((total_table_width - 1)) ]]; then
-                    if [[ "$border_type" == "top" ]]; then
-                        char_to_print="${THEME[t_junct]}"
-                    else
-                        char_to_print="${THEME[b_junct]}"
-                    fi
+                    char_to_print=$(if [[ "$border_type" == "top" ]]; then echo "${THEME[t_junct]}"; else echo "${THEME[b_junct]}"; fi)
                 fi
             fi
         fi
