@@ -306,16 +306,18 @@ process_file_batch() {
         
         # Use centralized ignore patterns from environment variable
         if [[ -n "$IGNORE_PATTERNS_SERIALIZED" ]]; then
-            local IFS='|'
-            local ignore_patterns_array=($IGNORE_PATTERNS_SERIALIZED)
-            for pattern in "${ignore_patterns_array[@]}"; do
+            # Split the serialized patterns properly
+            local patterns_string="$IGNORE_PATTERNS_SERIALIZED"
+            local pattern
+            while IFS='|' read -d '|' pattern || [[ -n "$pattern" ]]; do
+                [[ -z "$pattern" ]] && continue
                 shopt -s extglob
                 if [[ "$rel_path" == @($pattern) || "/$rel_path" == @($pattern) || "$rel_path/" == @($pattern) || "/$rel_path/" == @($pattern) ]]; then
                     shopt -u extglob
                     return 0  # Should ignore
                 fi
                 shopt -u extglob
-            done
+            done <<< "${patterns_string}|"
         fi
         
         return 1  # Should not ignore
