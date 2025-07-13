@@ -51,30 +51,30 @@ These tools help manage GitHub repositories:
 [![Count Lines of Code](https://github.com/500Foods/Scripts/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/Scripts/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2025-07-12 18:09:37 UTC
+Last updated at 2025-07-13 23:29:20 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Bourne Shell                    37           1799           2287          16335
+Bourne Shell                    36           1380           1259          15114
 Markdown                        17           1168              4           3502
-C                               14            344            423           3200
-C/C++ Header                    13             79            123            234
+C                               14            345            421           3157
+C/C++ Header                    13             80            126            235
 XML                              4              0              0            124
 Python                           4             56              1            112
 YAML                             3             16             26             72
+JSON                             3              0              0             52
 SQL                              1              6              5             38
 make                             1              6              8             32
 Text                             1              2              0              4
-JSON                             1              0              0              2
 -------------------------------------------------------------------------------
-SUM:                            96           3476           2877          23655
+SUM:                            97           3059           1850          22442
 -------------------------------------------------------------------------------
-8 Files were skipped (duplicate, binary, or without source code):
+9 Files were skipped (duplicate, binary, or without source code):
   gitignore: 2
+  sh: 2
   tables: 2
   gitattributes: 1
   license: 1
-  sh: 1
   txt: 1
 ```
 <!--CLOC-END-->
