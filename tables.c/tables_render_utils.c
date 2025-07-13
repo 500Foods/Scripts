@@ -516,6 +516,7 @@ char *replace_color_placeholders(const char *input) {
         {"{YELLOW}", "\033[0;33m"},
         {"{CYAN}", "\033[0;36m"},
         {"{MAGENTA}", "\033[0;35m"},
+        {"{WHITE}", "\033[1;37m"},
         {"{BOLD}", "\033[1m"},
         {"{DIM}", "\033[2m"},
         {"{UNDERLINE}", "\033[4m"},
@@ -680,4 +681,31 @@ char *clip_text(const char *text, int width, Position justification) {
         // For left or other justifications, use standard left-based clipping
         return clip_text_to_width(text, width);
     }
+}
+
+/*
+ * Clip text with color placeholders, processing colors first then clipping
+ */
+char *clip_text_with_colors(const char *text, int width, Position justification) {
+    if (text == NULL) {
+        return strdup("");
+    }
+
+    // First, process color placeholders to convert them to ANSI codes
+    char *colored_text = replace_color_placeholders(text);
+    if (colored_text == NULL) {
+        return strdup("");
+    }
+
+    // Check if clipping is needed
+    int display_width = get_display_width(colored_text);
+    if (display_width <= width) {
+        return colored_text; // Return the colored text if no clipping needed
+    }
+
+    // Clip the colored text using existing clipping function
+    char *clipped_text = clip_text(colored_text, width, justification);
+    free(colored_text);
+    
+    return clipped_text;
 }

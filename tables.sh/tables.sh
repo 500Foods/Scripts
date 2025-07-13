@@ -5,9 +5,9 @@ declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="for
 declare -A THEME
 # Only declare color variables if not already set (prevents readonly variable errors)
 if [[ -z "${RED:-}" ]]; then
-    declare -r RED='\033[0;31m' BLUE='\033[0;34m' GREEN='\033[0;32m' YELLOW='\033[0;33m' CYAN='\033[0;36m' MAGENTA='\033[0;35m' BOLD='\033[1m' DIM='\033[2m' UNDERLINE='\033[4m' NC='\033[0m'
+    declare -r RED=$'\033[0;31m' BLUE=$'\033[0;34m' GREEN=$'\033[0;32m' YELLOW=$'\033[0;33m' CYAN=$'\033[0;36m' MAGENTA=$'\033[0;35m' WHITE=$'\033[1;37m' BOLD=$'\033[1m' DIM=$'\033[2m' UNDERLINE=$'\033[4m' NC=$'\033[0m'
 fi
-replace_color_placeholders() { local text="$1"; text="${text//\{RED\}/$RED}"; text="${text//\{BLUE\}/$BLUE}"; text="${text//\{GREEN\}/$GREEN}"; text="${text//\{YELLOW\}/$YELLOW}"; text="${text//\{CYAN\}/$CYAN}"; text="${text//\{MAGENTA\}/$MAGENTA}"; text="${text//\{BOLD\}/$BOLD}"; text="${text//\{DIM\}/$DIM}"; text="${text//\{UNDERLINE\}/$UNDERLINE}"; text="${text//\{NC\}/$NC}"; text="${text//\{RESET\}/$NC}"; echo "$text"; }
+replace_color_placeholders() { local text="$1"; text="${text//\{RED\}/$RED}"; text="${text//\{BLUE\}/$BLUE}"; text="${text//\{GREEN\}/$GREEN}"; text="${text//\{YELLOW\}/$YELLOW}"; text="${text//\{CYAN\}/$CYAN}"; text="${text//\{MAGENTA\}/$MAGENTA}"; text="${text//\{WHITE\}/$WHITE}"; text="${text//\{BOLD\}/$BOLD}"; text="${text//\{DIM\}/$DIM}"; text="${text//\{UNDERLINE\}/$UNDERLINE}"; text="${text//\{NC\}/$NC}"; text="${text//\{RESET\}/$NC}"; echo "$text"; }
 validate_data() { local value="$1" type="$2"; case "$type" in text) [[ "$value" != "null" ]] && echo "$value" || echo "";; number|int|float|num) [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ || "$value" == "0" || "$value" == "null" ]] && echo "$value" || echo "";; kcpu) [[ "$value" =~ ^[0-9]+m$ || "$value" == "0" || "$value" == "0m" || "$value" == "null" || "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && echo "$value" || echo "$value";; kmem) [[ "$value" =~ ^[0-9]+[KMG]$ || "$value" =~ ^[0-9]+Mi$ || "$value" =~ ^[0-9]+Gi$ || "$value" =~ ^[0-9]+Ki$ || "$value" == "0" || "$value" == "null" ]] && echo "$value" || echo "$value";; *) echo "$value";; esac; }
 validate_text() { validate_data "$1" "text"; }
 validate_number() { validate_data "$1" "number"; }
@@ -416,11 +416,15 @@ update_summaries() {
                         # Use bc to add floating-point values for precision
                         AVG_SUMMARIES[$j]=$(echo "${AVG_SUMMARIES[$j]:-0} + $value" | bc)
                     else
-                        local int_value=${value%.*}; [[ "$int_value" == "$value" ]] && int_value=$value; AVG_SUMMARIES[$j]=$((${AVG_SUMMARIES[$j]:-0} + int_value))
+                        # Integer arithmetic for int/num types
+                        local int_value=${value%.*}
+                        [[ "$int_value" == "$value" ]] && int_value=$value
+                        AVG_SUMMARIES[$j]=$((${AVG_SUMMARIES[$j]:-0} + int_value))
                     fi
                     AVG_COUNTS[$j]=$(( ${AVG_COUNTS[$j]:-0} + 1 ))
                 fi
-            fi;;
+            fi
+            ;;
     esac
 }
 format_summary_value() {
@@ -516,32 +520,141 @@ calculate_table_width() {
     [[ $visible_count -gt 1 ]] && ((total_table_width += visible_count - 1))
     echo "$total_table_width"
 }
-clip_text() {
+clip_text_with_colors() {
     local text="$1" width="$2" justification="$3"
+    
+    # First, convert color placeholders to ANSI codes
+    local colored_text
+    colored_text=$(replace_color_placeholders "$text")
+    
+    # Check if clipping is needed after color processing
     local display_length
-    display_length=$(get_display_length "$text")
+    display_length=$(get_display_length "$colored_text")
     if [[ $display_length -le $width ]]; then
-        echo "$text"
+        echo "$colored_text"
         return
     fi
-    if [[ "$text" =~ $'\033\[' ]]; then
-        echo "$text"
-        return
-    fi
+    
+    # Helper function to clip text while preserving ANSI codes
+    # This matches the C implementation's logic exactly
     case "$justification" in
-        right) echo "${text: -${width}}" ;;
-        center) local excess=$(( display_length - width )); local left_clip=$(( excess / 2 )); echo "${text:${left_clip}:${width}}" ;;
-        *) echo "${text:0:${width}}" ;;
+        right)
+            # For right justification, skip characters from the beginning
+            local excess=$(( display_length - width ))
+            local pos=0
+            local visible_count=0
+            local in_ansi=false
+            
+            # Skip 'excess' visible characters from the beginning
+            while [[ $pos -lt ${#colored_text} && $visible_count -lt $excess ]]; do
+                local char="${colored_text:$pos:1}"
+                if [[ "$char" == $'\033' ]]; then
+                    in_ansi=true
+                elif [[ "$in_ansi" == true && "$char" == "m" ]]; then
+                    in_ansi=false
+                elif [[ "$in_ansi" == false ]]; then
+                    ((visible_count++))
+                fi
+                ((pos++))
+            done
+            
+            # Return the remainder
+            echo "${colored_text:$pos}"
+            ;;
+        center)
+            # For center justification, clip from both ends
+            local excess=$(( display_length - width ))
+            local left_clip=$(( excess / 2 ))
+            
+            # Find start position by skipping left_clip visible characters
+            local start_pos=0
+            local visible_count=0
+            local in_ansi=false
+            
+            while [[ $start_pos -lt ${#colored_text} && $visible_count -lt $left_clip ]]; do
+                local char="${colored_text:$start_pos:1}"
+                if [[ "$char" == $'\033' ]]; then
+                    in_ansi=true
+                elif [[ "$in_ansi" == true && "$char" == "m" ]]; then
+                    in_ansi=false
+                elif [[ "$in_ansi" == false ]]; then
+                    ((visible_count++))
+                fi
+                ((start_pos++))
+            done
+            
+            # Find end position by taking 'width' visible characters from start_pos
+            local end_pos=$start_pos
+            visible_count=0
+            in_ansi=false
+            
+            while [[ $end_pos -lt ${#colored_text} && $visible_count -lt $width ]]; do
+                local char="${colored_text:$end_pos:1}"
+                if [[ "$char" == $'\033' ]]; then
+                    in_ansi=true
+                elif [[ "$in_ansi" == true && "$char" == "m" ]]; then
+                    in_ansi=false
+                elif [[ "$in_ansi" == false ]]; then
+                    ((visible_count++))
+                fi
+                ((end_pos++))
+            done
+            
+            # Return the middle portion
+            echo "${colored_text:$start_pos:$((end_pos - start_pos))}"
+            ;;
+        *)
+            # For left justification, take first 'width' visible characters
+            local pos=0
+            local visible_count=0
+            local in_ansi=false
+            
+            while [[ $pos -lt ${#colored_text} && $visible_count -lt $width ]]; do
+                local char="${colored_text:$pos:1}"
+                if [[ "$char" == $'\033' ]]; then
+                    in_ansi=true
+                elif [[ "$in_ansi" == true && "$char" == "m" ]]; then
+                    in_ansi=false
+                elif [[ "$in_ansi" == false ]]; then
+                    ((visible_count++))
+                fi
+                ((pos++))
+            done
+            
+            # Return the left portion
+            echo "${colored_text:0:$pos}"
+            ;;
     esac
+}
+
+clip_text() {
+    clip_text_with_colors "$@"
 }
 render_cell() {
     local content="$1" width="$2" padding="$3" justification="$4" color="$5"
     local content_width=$((width - (2 * padding)))
+    local visible_len
+    visible_len=$(get_display_length "$content")
+    local left_spaces right_spaces
     case "$justification" in
-        right) printf "%*s${color}%*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$padding" "" "$content_width" "$content" "$padding" "" ;;
-        center) local content_len; content_len=$(get_display_length "$content"); local spaces=$(( (content_width - content_len) / 2 )); local left_spaces=$(( padding + spaces )); local right_spaces=$(( padding + content_width - content_len - spaces )); printf "%*s${color}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$left_spaces" "" "$content" "$right_spaces" "" ;;
-        *) printf "%*s${color}%-*s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" "$padding" "" "$content_width" "$content" "$padding" "" ;;
+        right)
+            left_spaces=$((padding + content_width - visible_len))
+            right_spaces=$padding
+            ;;
+        center)
+            local spaces=$(( (content_width - visible_len) / 2 ))
+            left_spaces=$((padding + spaces))
+            right_spaces=$((padding + content_width - visible_len - spaces))
+            ;;
+        *)
+            left_spaces=$padding
+            right_spaces=$((padding + content_width - visible_len))
+            ;;
     esac
+    printf "%*s${color}%s${THEME[text_color]}%*s${THEME[border_color]}${THEME[v_line]}${THEME[text_color]}" \
+        "$left_spaces" "" \
+        "$content" \
+        "$right_spaces" ""
 }
 render_table_element() {
     local element_type="$1" total_table_width="$2"
@@ -803,23 +916,15 @@ render_data_rows() {
                 fi
                 [[ $line_index -gt $row_line_count ]] && row_line_count=$line_index
             else
+                # No wrapping - handle single line with potential clipping
                 local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
-                local display_len; display_len=$(get_display_length "$display_value")
-                if [[ $display_len -gt $content_width ]]; then
-                    case "${JUSTIFICATIONS[$j]}" in
-                        right)
-                            display_value="${display_value: -${content_width}}"
-                            ;;
-                        center)
-                            local excess=$(( display_len - content_width ))
-                            local left_clip=$(( excess / 2 ))
-                            display_value="${display_value:${left_clip}:${content_width}}"
-                            ;;
-                        *)
-                            display_value="${display_value:0:${content_width}}"
-                            ;;
-                    esac
+                
+                # Use color-aware clipping to properly handle ANSI codes
+                if [[ "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                    display_value=$(clip_text_with_colors "$display_value" "$content_width" "${JUSTIFICATIONS[$j]}")
                 fi
+                
+                # Store the single line value
                 line_values[$j,0]="$display_value"
             fi
         done
@@ -830,23 +935,19 @@ render_data_rows() {
                     local display_value="${line_values[$j,$line]:-}"
                     local content_width=$((WIDTHS[j] - (2 * PADDINGS[j])))
                     
-                    # Clip the display value if it exceeds the content width and a width is specified
-                    local display_value_len; display_value_len=$(get_display_length "$display_value")
-                    if [[ $display_value_len -gt $content_width && "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
-                        case "${JUSTIFICATIONS[$j]}" in
-                            right)
-                                display_value="${display_value: -$content_width}"
-                                ;;
-                            center)
-                                local excess=$(( display_value_len - content_width ))
-                                local left_clip=$(( excess / 2 ))
-                                display_value="${display_value:$left_clip:$content_width}"
-                                ;;
-                            *)
-                                display_value="${display_value:0:$content_width}"
-                                ;;
-                        esac
+                    # Process color placeholders and handle clipping if needed
+                    display_value=$(replace_color_placeholders "$display_value")
+                    display_value=$(printf '%b' "$display_value")
+                    
+                    # Only clip if width is specified and the content is too long
+                    if [[ "${IS_WIDTH_SPECIFIED[j]}" == "true" ]]; then
+                        local display_length
+                        display_length=$(get_display_length "$display_value")
+                        if [[ $display_length -gt $content_width ]]; then
+                            display_value=$(clip_text_with_colors "$display_value" "$content_width" "${JUSTIFICATIONS[$j]}")
+                        fi
                     fi
+                    
                     render_cell "$display_value" "${WIDTHS[j]}" "${PADDINGS[j]}" "${JUSTIFICATIONS[j]}" "${THEME[text_color]}"
                 fi
             done

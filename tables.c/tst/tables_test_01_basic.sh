@@ -71,7 +71,7 @@ cat > "$data_file" << 'EOF'
     "load_avg": 3.21,
     "cpu_usage": "2100m",
     "memory_usage": "4096Mi",
-    "status": "Running"
+    "status": "{YELLOW}Running{RESET}"
   }
 ]
 EOF
@@ -286,4 +286,187 @@ EOF
 
 echo -e "\nTestC 1-F: Text datatype with different justifications"
 echo "-------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# Test 1-G: Color placeholders with width constraints (Color Clipping Test)
+cat > "$data_file" << 'EOF'
+[
+  {
+    "name": "{GREEN}Success Item{RESET}",
+    "status": "{WHITE}Processing{RESET}",
+    "value": 100
+  },
+  {
+    "name": "{RED}Error Item{RESET}",
+    "status": "{YELLOW}Warning Status{RESET}",
+    "value": 250
+  },
+  {
+    "name": "{BLUE}Info Item{RESET}",
+    "status": "{CYAN}Ready{RESET}",
+    "value": 75
+  },
+  {
+    "name": "{WHITE}Bright Item{RESET}",
+    "status": "{MAGENTA}Special{RESET}",
+    "value": 999
+  }
+]
+EOF
+
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "Color Test - {WHITE}WHITE{RESET} and {RED}RED{RESET} in Title",
+  "title_position": "center",
+  "columns": [
+    {
+      "header": "Name",
+      "key": "name",
+      "justification": "left",
+      "datatype": "text",
+      "width": 20
+    },
+    {
+      "header": "Status",
+      "key": "status", 
+      "justification": "center",
+      "datatype": "text",
+      "width": 25
+    },
+    {
+      "header": "Value",
+      "key": "value",
+      "justification": "right", 
+      "datatype": "int",
+      "width": 15
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 1-G: Color placeholders with width constraints (Current Bug Fix Test)"
+echo "----------------------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# Test 1-H: Color clipping with different justifications
+cat > "$data_file" << 'EOF'
+[
+  {
+    "left_text": "{RED}This is a very long red text that will be clipped{RESET}",
+    "center_text": "{BLUE}This is a very long blue text that will be clipped{RESET}",
+    "right_text": "{GREEN}This is a very long green text that will be clipped{RESET}"
+  },
+  {
+    "left_text": "{YELLOW}Short{RESET}",
+    "center_text": "{CYAN}Medium text{RESET}",
+    "right_text": "{MAGENTA}Longer text here{RESET}"
+  },
+  {
+    "left_text": "No colors here",
+    "center_text": "{WHITE}Mixed {RED}colors {BLUE}in {GREEN}one{RESET}",
+    "right_text": "{BOLD}{UNDERLINE}Formatted text{RESET}"
+  }
+]
+EOF
+
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Blue",
+  "title": "{BOLD}Color Clipping Test with Different Justifications{RESET}",
+  "title_position": "center",
+  "columns": [
+    {
+      "header": "Left Clipped",
+      "key": "left_text",
+      "justification": "left",
+      "datatype": "text",
+      "width": 25
+    },
+    {
+      "header": "Center Clipped",
+      "key": "center_text", 
+      "justification": "center",
+      "datatype": "text",
+      "width": 25
+    },
+    {
+      "header": "Right Clipped",
+      "key": "right_text",
+      "justification": "right", 
+      "datatype": "text",
+      "width": 25
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 1-H: Color clipping with different justifications"
+echo "--------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG
+
+# Test 1-I: Complex color combinations and edge cases
+cat > "$data_file" << 'EOF'
+[
+  {
+    "simple": "{RED}Red{RESET}",
+    "nested": "{BOLD}{RED}Bold Red{RESET}{RESET}",
+    "multiple": "{RED}R{GREEN}G{BLUE}B{RESET}",
+    "mixed": "Start {YELLOW}Yellow{RESET} End"
+  },
+  {
+    "simple": "Plain text",
+    "nested": "{UNDERLINE}{CYAN}Underlined Cyan{RESET}",
+    "multiple": "{WHITE}{BOLD}Bold White{RESET}",
+    "mixed": "{DIM}Dim{RESET} and {BRIGHT}Bright{RESET}"
+  },
+  {
+    "simple": "{GREEN}Very long green text that should be clipped{RESET}",
+    "nested": "No color but very long text that should also be clipped",
+    "multiple": "{RED}A{BLUE}B{GREEN}C{YELLOW}D{CYAN}E{MAGENTA}F{RESET}",
+    "mixed": "Mix of {RED}red{RESET} and normal text here"
+  }
+]
+EOF
+
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "title": "{GREEN}Complex Color Test{RESET} - {BOLD}Edge Cases{RESET}",
+  "title_position": "full",
+  "columns": [
+    {
+      "header": "Simple",
+      "key": "simple",
+      "justification": "left",
+      "datatype": "text",
+      "width": 15
+    },
+    {
+      "header": "Nested",
+      "key": "nested", 
+      "justification": "center",
+      "datatype": "text",
+      "width": 20
+    },
+    {
+      "header": "Multiple",
+      "key": "multiple",
+      "justification": "right", 
+      "datatype": "text",
+      "width": 18
+    },
+    {
+      "header": "Mixed Content",
+      "key": "mixed",
+      "justification": "left", 
+      "datatype": "text",
+      "width": 22
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 1-I: Complex color combinations and edge cases"
+echo "-----------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file" $DEBUG_FLAG $DEBUG_LAYOUT_FLAG

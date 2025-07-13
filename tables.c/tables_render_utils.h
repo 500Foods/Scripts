@@ -52,4 +52,9 @@ char *replace_color_placeholders(const char *input);
  */
 char *clip_text(const char *text, int width, Position justification);
 
+/*
+ * Clip text with color placeholders, processing colors first then clipping
+ */
+char *clip_text_with_colors(const char *text, int width, Position justification);
+
 #endif /* TABLES_RENDER_UTILS_H */

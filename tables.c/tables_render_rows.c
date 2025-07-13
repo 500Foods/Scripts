@@ -75,93 +75,18 @@ void render_rows(TableConfig *config, TableData *data) {
             char *raw_value = row->values[j];
             char *formatted = format_display_value_with_precision(raw_value, col->null_val, col->zero_val, col->data_type, col->format, col->string_limit, col->wrap_mode, col->wrap_char, col->justify, data->summaries[j].max_decimal_places);
             if (col->width_specified && col->wrap_mode == WRAP_CLIP) {
-                // Truncate if width is specified and wrapping is disabled
-                int display_width = get_display_width(formatted);
+                // Use color-aware clipping for better handling of color placeholders
                 int effective_width = col->width - 2; // Account for padding on both sides (1 left + 1 right)
-                if (display_width > effective_width) {
-                    char *truncated = malloc(col->width + 1);
-                    if (truncated) {
-                        int k = 0, display_count = 0;
-                        int in_ansi = 0;
-                        const char *end_p = formatted + strlen(formatted) - 1;
-                        
-                        if (col->justify == JUSTIFY_RIGHT) {
-                            // For right justification, start from the end and take the last 'effective_width' characters
-                            int char_count = 0;
-                            const char *start_pos = formatted;
-                            
-                            // Count total display characters first
-                            int total_chars = get_display_width(formatted);
-                            int chars_to_skip = total_chars - effective_width;
-                            
-                            // Skip the first chars_to_skip display characters
-                            for (const char *p = formatted; *p && char_count < chars_to_skip; p++) {
-                                if (*p == '\033') {
-                                    in_ansi = 1;
-                                    start_pos = p;
-                                } else if (in_ansi && *p == 'm') {
-                                    in_ansi = 0;
-                                    start_pos = p + 1;
-                                } else if (in_ansi) {
-                                    start_pos = p;
-                                } else {
-                                    char_count++;
-                                    start_pos = p + 1;
-                                }
-                            }
-                            
-                            // Copy from start_pos to end
-                            for (const char *p = start_pos; *p; p++) {
-                                truncated[k++] = *p;
-                            }
-                        } else if (col->justify == JUSTIFY_CENTER) {
-                            // For center justification, take middle 'effective_width' characters
-                            int total_excess = display_width - effective_width;
-                            int left_excess = total_excess / 2;
-                            int right_excess = total_excess - left_excess;
-                            const char *left_cut = formatted;
-                            const char *right_cut = end_p;
-                            int left_count = 0, right_count = 0;
-                            
-                            // Cut from left
-                            for (const char *p = formatted; *p && left_count < left_excess; p++) {
-                                if (*p == '\033') in_ansi = 1;
-                                else if (in_ansi && *p == 'm') in_ansi = 0;
-                                else if (!in_ansi) left_count++;
-                                left_cut = p;
-                            }
-                            in_ansi = 0; // Reset for right cut
-                            // Cut from right
-                            for (const char *p = end_p; p >= formatted && right_count < right_excess; p--) {
-                                if (*p == '\033') in_ansi = 1;
-                                else if (in_ansi && *p == 'm') in_ansi = 0;
-                                else if (!in_ansi) right_count++;
-                                right_cut = p;
-                            }
-                            // Copy from left_cut + 1 to right_cut - 1 if possible
-                            if (left_cut + 1 < right_cut) {
-                                for (const char *p = left_cut + 1; p < right_cut && *p; p++) {
-                                    truncated[k++] = *p;
-                                }
-                            } else {
-                                for (const char *p = left_cut; p <= right_cut && *p; p++) {
-                                    truncated[k++] = *p;
-                                }
-                            }
-                        } else {
-                            // Left justification (default), take first 'effective_width' characters
-                            for (const char *p = formatted; *p && display_count < effective_width; p++) {
-                                if (*p == '\033') in_ansi = 1;
-                                else if (in_ansi && *p == 'm') in_ansi = 0;
-                                else if (!in_ansi) display_count++;
-                                truncated[k++] = *p;
-                            }
-                        }
-                        truncated[k] = '\0';
-                        free(formatted);
-                        formatted = truncated;
-                    }
+                Position clip_position = POSITION_LEFT;
+                if (col->justify == JUSTIFY_RIGHT) {
+                    clip_position = POSITION_RIGHT;
+                } else if (col->justify == JUSTIFY_CENTER) {
+                    clip_position = POSITION_CENTER;
                 }
+                
+                char *clipped = clip_text_with_colors(formatted, effective_width, clip_position);
+                free(formatted);
+                formatted = clipped;
                 formatted_values[i][j] = malloc(sizeof(char *));
                 formatted_values[i][j][0] = formatted;
                 line_counts[i][j] = 1;
@@ -320,7 +245,9 @@ void render_rows(TableConfig *config, TableData *data) {
                 if (!config->columns[j].visible) continue;
                 ColumnConfig *col = &config->columns[j];
                 char *text = (line < line_counts[i][j]) ? formatted_values[i][j][line] : "";
-                int value_width = get_display_width(text);
+                // Process color placeholders in data fields
+                char *colored_text = replace_color_placeholders(text);
+                int value_width = get_display_width(colored_text);
                 int total_padding = col->width - value_width;
                 int padding_left = 1;  // Minimum 1 space padding on left
                 int padding_right = 1; // Minimum 1 space padding on right
@@ -335,8 +262,9 @@ void render_rows(TableConfig *config, TableData *data) {
                         padding_right += remaining_padding;
                     }
                 }
-                printf("%s%*s%s%*s", config->theme.text_color, padding_left, "", text, padding_right, "");
+                printf("%s%*s%s%*s", config->theme.text_color, padding_left, "", colored_text, padding_right, "");
                 printf("%s%s", config->theme.border_color, config->theme.v_line);
+                free(colored_text);
             }
             printf("%s\n", config->theme.text_color);
         }
