@@ -27,6 +27,8 @@ typedef struct {
     double avg_sum;         /* Sum for calculating average */
     int avg_count;          /* Count for calculating average */
     int max_decimal_places; /* Maximum decimal places found in float data */
+    int blanks;             /* Count of blank or zero values */
+    int nonblanks;          /* Count of non-blank or non-zero values */
 } SummaryStats;
 
 /* Structure to hold table data */

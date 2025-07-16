@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tables.sh - Library for JSON to ANSI tables
 declare -g COLUMN_COUNT=0 MAX_LINES=1 THEME_NAME="Red" DEFAULT_PADDING=1
-declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique" [float_validate]="validate_number" [float_format]="format_float" [float_summary_types]="sum min max avg count unique" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique")
+declare -A DATATYPE_HANDLERS=([text_validate]="validate_text" [text_format]="format_text" [text_summary_types]="count unique blanks nonblanks" [int_validate]="validate_number" [int_format]="format_number" [int_summary_types]="sum min max avg count unique blanks nonblanks" [num_validate]="validate_number" [num_format]="format_num" [num_summary_types]="sum min max avg count unique blanks nonblanks" [float_validate]="validate_number" [float_format]="format_float" [float_summary_types]="sum min max avg count unique blanks nonblanks" [kcpu_validate]="validate_kcpu" [kcpu_format]="format_kcpu" [kcpu_summary_types]="sum min max avg count unique blanks nonblanks" [kmem_validate]="validate_kmem" [kmem_format]="format_kmem" [kmem_summary_types]="sum min max avg count unique blanks nonblanks")
 declare -A THEME
 # Only declare color variables if not already set (prevents readonly variable errors)
 if [[ -z "${RED:-}" ]]; then
@@ -250,6 +250,7 @@ initialize_summaries() {
     for ((i=0; i<COLUMN_COUNT; i++)); do
         SUM_SUMMARIES[$i]=0; COUNT_SUMMARIES[$i]=0; MIN_SUMMARIES[$i]=""; MAX_SUMMARIES[$i]=""
         UNIQUE_VALUES[$i]=""; AVG_SUMMARIES[$i]=0; AVG_COUNTS[$i]=0; MAX_DECIMAL_PLACES[$i]=0
+        blanks_count[$i]=0; nonblanks_count[$i]=0
     done
 }
 prepare_data() {
@@ -299,6 +300,18 @@ sort_data() {
 process_data_rows() {
     local row_count; MAX_LINES=1; row_count=${#DATA_ROWS[@]}
     [[ $row_count -eq 0 ]] && return
+    # First pass: update summaries and max decimal places
+    for ((i=0; i<row_count; i++)); do
+        declare -A row_data
+        if ! eval "${DATA_ROWS[$i]}"; then continue; fi
+        for ((j=0; j<COLUMN_COUNT; j++)); do
+            local key="${KEYS[$j]}" value="null"
+            if [[ -v "row_data[$key]" ]]; then value="${row_data[$key]}"; fi
+            local validated_value=$("${DATATYPE_HANDLERS[${DATATYPES[$j]}_validate]}" "$value")
+            update_summaries "$j" "$validated_value" "${DATATYPES[$j]}" "${SUMMARIES[$j]}"
+        done
+    done
+    # Second pass: calculate display values, widths, and max lines
     ROW_JSONS=()
     for ((i=0; i<row_count; i++)); do
         local row_json line_count=1
@@ -307,48 +320,42 @@ process_data_rows() {
         if ! eval "${DATA_ROWS[$i]}"; then continue; fi
         for ((j=0; j<COLUMN_COUNT; j++)); do
             local key="${KEYS[$j]}" datatype="${DATATYPES[$j]}" format="${FORMATS[$j]}" string_limit="${STRING_LIMITS[$j]}" wrap_mode="${WRAP_MODES[$j]}" wrap_char="${WRAP_CHARS[$j]}"
-            local validate_fn="${DATATYPE_HANDLERS[${datatype}_validate]}" format_fn="${DATATYPE_HANDLERS[${datatype}_format]}"
             local value="null"
             if [[ -v "row_data[$key]" ]]; then value="${row_data[$key]}"; fi
-            value=$("$validate_fn" "$value")
-            local display_value
-            if [[ "$datatype" == "float" ]]; then
-                display_value=$("$format_fn" "$value" "$format" "$j")
-            else
-                display_value=$("$format_fn" "$value" "$format" "$string_limit" "$wrap_mode" "$wrap_char")
-            fi
-            if [[ "$value" == "null" ]]; then
+            local validated_value=$("${DATATYPE_HANDLERS[${datatype}_validate]}" "$value")
+            local display_value=$("${DATATYPE_HANDLERS[${datatype}_format]}" "$validated_value" "$format" "$string_limit" "$wrap_mode" "$wrap_char" "$j")
+            if [[ "$validated_value" == "null" ]]; then
                 case "${NULL_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
-            elif [[ "$value" == "0" || "$value" == "0m" || "$value" == "0M" || "$value" == "0G" || "$value" == "0K" ]]; then
-                case "${ZERO_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+            elif [[ "$datatype" == "int" || "$datatype" == "num" || "$datatype" == "float" || "$datatype" == "kcpu" || "$datatype" == "kmem" ]]; then
+                local is_zero=0 num_val=$(echo "$validated_value" | awk '{print ($1 + 0)}')
+                if [[ $(echo "if ($num_val == 0) 1 else 0" | bc) -eq 1 ]]; then is_zero=1; fi
+                if [[ $is_zero -eq 1 ]]; then
+                    case "${ZERO_VALUES[$j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+                fi
             fi
             if [[ "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
-                if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
+                if [[ -n "$wrap_char" && "$wrap_mode" == "wrap" && -n "$display_value" && "$validated_value" != "null" ]]; then
                     local max_len=0 IFS="$wrap_char"; read -ra parts <<<"$display_value"
                     for part in "${parts[@]}"; do
-                        local len
-                        len=$(get_display_length "$part")
+                        local len=$(get_display_length "$part")
                         [[ $len -gt $max_len ]] && max_len=$len
                     done
                     local padded_width=$((max_len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
                     [[ ${#parts[@]} -gt $line_count ]] && line_count=${#parts[@]}
                 else
-                    local len
-                    len=$(get_display_length "$display_value")
+                    local len=$(get_display_length "$display_value")
                     local padded_width=$((len + (2 * PADDINGS[j]))); [[ $padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$padded_width
                 fi
             fi
-            update_summaries "$j" "$value" "${DATATYPES[$j]}" "${SUMMARIES[$j]}"
         done
         [[ $line_count -gt $MAX_LINES ]] && MAX_LINES=$line_count
     done
+    # Update widths for summaries
     for ((j=0; j<COLUMN_COUNT; j++)); do
         if [[ "${SUMMARIES[$j]}" != "none" ]]; then
-            local summary_value
-            summary_value=$(format_summary_value "$j" "${SUMMARIES[$j]}" "${DATATYPES[$j]}" "${FORMATS[$j]}")
+            local summary_value=$(format_summary_value "$j" "${SUMMARIES[$j]}" "${DATATYPES[$j]}" "${FORMATS[$j]}")
             if [[ -n "$summary_value" && "${IS_WIDTH_SPECIFIED[j]}" != "true" && "${VISIBLES[j]}" == "true" ]]; then
-                local summary_len
-                summary_len=$(get_display_length "$summary_value")
+                local summary_len=$(get_display_length "$summary_value")
                 local summary_padded_width=$((summary_len + (2 * PADDINGS[j])))
                 [[ $summary_padded_width -gt ${WIDTHS[j]} ]] && WIDTHS[j]=$summary_padded_width
             fi
@@ -368,6 +375,42 @@ update_summaries() {
             MAX_DECIMAL_PLACES[$j]=$decimal_places
         fi
     fi
+    # Compute is_blank matching C logic
+    local is_blank=0
+    if [[ "$value" == "null" || -z "$value" ]]; then
+        is_blank=1
+    else
+        local num_val=0
+        case "$datatype" in
+            int|num|float)
+                num_val=$(echo "$value" | awk '{print $1 + 0}')
+                if [[ $(echo "if ($num_val == 0) 1 else 0" | bc) -eq 1 ]]; then is_blank=1; fi
+                ;;
+            kcpu)
+                local num_part="$value"
+                if [[ "$value" == *m ]]; then num_part="${value%m}"; fi
+                num_val=$(echo "$num_part" | awk '{print $1 + 0}')
+                if [[ $(echo "if ($num_val == 0) 1 else 0" | bc) -eq 1 ]]; then is_blank=1; fi
+                ;;
+            kmem)
+                local unit="" num_part="$value"
+                if [[ "$value" =~ ([0-9.]+)([KMG]i?)$ ]]; then
+                    num_part=${BASH_REMATCH[1]}
+                    unit=${BASH_REMATCH[2]}
+                fi
+                num_val=$(echo "$num_part" | awk '{print $1 + 0}')
+                case "$unit" in
+                    K|Ki) num_val=$(echo "$num_val / 1000" | bc -l) ;;
+                    G|Gi) num_val=$(echo "$num_val * 1000" | bc -l) ;;
+                    M|Mi) ;;
+                esac
+                if [[ $(echo "if ($num_val == 0) 1 else 0" | bc) -eq 1 ]]; then is_blank=1; fi
+                ;;
+        esac
+    fi
+    (( blanks_count[$j] += is_blank ))
+    (( nonblanks_count[$j] += (1 - is_blank) ))
+    [[ $is_blank -eq 1 ]] && return
     case "$summary_type" in
         sum)
             if [[ "$datatype" == "kcpu" && "$value" =~ ^[0-9]+m$ ]]; then SUM_SUMMARIES[$j]=$(( ${SUM_SUMMARIES[$j]:-0} + ${value%m} ))
@@ -484,6 +527,12 @@ format_summary_value() {
             else
                 summary_value="0"
             fi
+            ;;
+        blanks)
+            summary_value=$(format_with_commas "${blanks_count[$j]:-0}")
+            ;;
+        nonblanks)
+            summary_value=$(format_with_commas "${nonblanks_count[$j]:-0}")
             ;;
         avg)
             if [[ -n "${AVG_SUMMARIES[$j]}" && "${AVG_COUNTS[$j]}" -gt 0 ]]; then
@@ -695,11 +744,11 @@ render_table_element() {
     local available_width=$((element_width - (2 * DEFAULT_PADDING)))
     element_text=$(clip_text "$element_text" "$available_width" "$element_position")
     case "$element_position" in
-        left) printf "%*s${color_theme}%-*s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
-        right) printf "%*s${color_theme}%*s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
-        center) local element_len; element_len=$(get_display_length "$element_text"); printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$element_text" "$((available_width - element_len + DEFAULT_PADDING))" "" ;;
-        full) local text_len; text_len=$(get_display_length "$element_text"); local spaces=$(( (available_width - text_len) / 2 )); local left_spaces=$(( DEFAULT_PADDING + spaces )); local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces )); printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$left_spaces" "" "$element_text" "$right_spaces" "" ;;
-        *) printf "%*s${color_theme}%s${THEME[text_color]}%*s" "$DEFAULT_PADDING" "" "$element_text" "$DEFAULT_PADDING" "" ;;
+        left) printf "%*s${color_theme}%-*s${NC}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
+        right) printf "%*s${color_theme}%*s${NC}%*s" "$DEFAULT_PADDING" "" "$available_width" "$element_text" "$DEFAULT_PADDING" "" ;;
+        center) local element_len; element_len=$(get_display_length "$element_text"); printf "%*s${color_theme}%s${NC}%*s" "$DEFAULT_PADDING" "" "$element_text" "$((available_width - element_len + DEFAULT_PADDING))" "" ;;
+        full) local text_len; text_len=$(get_display_length "$element_text"); local spaces=$(( (available_width - text_len) / 2 )); local left_spaces=$(( DEFAULT_PADDING + spaces )); local right_spaces=$(( DEFAULT_PADDING + available_width - text_len - spaces )); printf "%*s${color_theme}%s${NC}%*s" "$left_spaces" "" "$element_text" "$right_spaces" "" ;;
+        *) printf "%*s${color_theme}%s${NC}%*s" "$DEFAULT_PADDING" "" "$element_text" "$DEFAULT_PADDING" "" ;;
     esac
     printf "${THEME[border_color]}%s${THEME[text_color]}\n" "${THEME[v_line]}"
     if [[ "$element_type" == "footer" ]]; then
@@ -845,7 +894,7 @@ render_data_rows() {
             fi
         done
         if [[ "$needs_break" == "true" ]]; then
-            render_table_separator "middle"
+    render_table_separator "middle"
         fi
         local -A line_values
         local row_line_count=1
@@ -853,20 +902,18 @@ render_data_rows() {
             local key="${KEYS[$j]}" value
             value="${row_data[$key]}"
             local display_value
-            if [[ "${DATATYPES[j]}" == "float" ]]; then
-                # For float datatype, use the special formatting function
-                local validate_fn="${DATATYPE_HANDLERS[${DATATYPES[j]}_validate]}"
-                local validated_value
-                validated_value=$("$validate_fn" "$value")
-                if [[ "$validated_value" == "null" ]]; then
-                    case "${NULL_VALUES[j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
-                elif [[ "$validated_value" == "0" ]]; then
+            local validate_fn="${DATATYPE_HANDLERS[${DATATYPES[j]}_validate]}"
+            local validated_value=$("$validate_fn" "$value")
+            display_value=$("${DATATYPE_HANDLERS[${DATATYPES[j]}_format]}" "$validated_value" "${FORMATS[j]}" "${STRING_LIMITS[j]}" "${WRAP_MODES[j]}" "${WRAP_CHARS[j]}" "$j")
+            if [[ "$validated_value" == "null" ]]; then
+                case "${NULL_VALUES[j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
+            elif [[ "$datatype" == "int" || "$datatype" == "num" || "$datatype" == "float" || "$datatype" == "kcpu" || "$datatype" == "kmem" ]]; then
+                local is_zero=0
+                local num_val=$(echo "$validated_value" | awk '{print $1 + 0}')
+                if [[ $(echo "if ($num_val == 0) 1 else 0" | bc) -eq 1 ]]; then is_zero=1; fi
+                if [[ $is_zero -eq 1 ]]; then
                     case "${ZERO_VALUES[j]}" in 0) display_value="0";; missing) display_value="Missing";; *) display_value="";; esac
-                else
-                    display_value=$(format_float "$validated_value" "${FORMATS[j]}" "$j")
                 fi
-            else
-                display_value=$(format_display_value "$value" "${NULL_VALUES[j]}" "${ZERO_VALUES[j]}" "${DATATYPES[j]}" "${FORMATS[j]}" "${STRING_LIMITS[j]}" "${WRAP_MODES[j]}" "${WRAP_CHARS[j]}")
             fi
             if [[ -n "${WRAP_CHARS[$j]}" && "${WRAP_MODES[$j]}" == "wrap" && -n "$display_value" && "$value" != "null" ]]; then
                 local IFS="${WRAP_CHARS[$j]}"

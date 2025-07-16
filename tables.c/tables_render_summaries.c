@@ -197,6 +197,18 @@ void render_summaries(TableConfig *config, TableData *data) {
             case SUMMARY_UNIQUE:
                 snprintf(summary_text, sizeof(summary_text), "%d", stats->unique_count);
                 break;
+            case SUMMARY_BLANKS:
+                snprintf(summary_text, sizeof(summary_text), "%d", stats->blanks);
+                char *formatted_blanks = format_with_commas(summary_text);
+                strncpy(summary_text, formatted_blanks, sizeof(summary_text) - 1);
+                free(formatted_blanks);
+                break;
+            case SUMMARY_NONBLANKS:
+                snprintf(summary_text, sizeof(summary_text), "%d", stats->nonblanks);
+                char *formatted_nonblanks = format_with_commas(summary_text);
+                strncpy(summary_text, formatted_nonblanks, sizeof(summary_text) - 1);
+                free(formatted_nonblanks);
+                break;
             default:
                 summary_text[0] = '\0';
         }

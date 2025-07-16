@@ -211,8 +211,7 @@ void render_footer(TableConfig *config, int total_width) {
         right_padding = available_width - text_width - left_padding;
     }
 
-    printf("%*s%s%s%*s", left_padding, "", config->theme.footer_color, clipped_text, right_padding, "");
-    printf("%s%s\n", config->theme.border_color, config->theme.v_line);
+    printf("%*s%s%s%s%*s%s%s\n", left_padding, "", config->theme.footer_color, clipped_text, config->theme.text_color, right_padding, "", config->theme.border_color, config->theme.v_line);
     
     free(clipped_text);
 

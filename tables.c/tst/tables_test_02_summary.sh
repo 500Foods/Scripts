@@ -25,7 +25,10 @@ cat > "$data_file" << 'EOF'
     "load_avg": 2.45,
     "cpu_usage": "1250m",
     "memory_usage": "2048Mi",
-    "status": "Running"
+    "status": "Running",
+    "test_int": 100,
+    "test_float": 1.23,
+    "test_string": "hello"
   },
   {
     "id": 2,
@@ -34,7 +37,10 @@ cat > "$data_file" << 'EOF'
     "load_avg": 5.12,
     "cpu_usage": "3200m",
     "memory_usage": "8192Mi", 
-    "status": "Running"
+    "status": "Running",
+    "test_int": 0,
+    "test_float": 0.0,
+    "test_string": ""
   },
   {
     "id": 3,
@@ -43,7 +49,10 @@ cat > "$data_file" << 'EOF'
     "load_avg": 0.85,
     "cpu_usage": "500m",
     "memory_usage": "1024Mi",
-    "status": "Starting"
+    "status": "Starting",
+    "test_int": null,
+    "test_float": null,
+    "test_string": null
   },
   {
     "id": 4,
@@ -52,7 +61,22 @@ cat > "$data_file" << 'EOF'
     "load_avg": 3.21,
     "cpu_usage": "2100m",
     "memory_usage": "4096Mi",
-    "status": "Running"
+    "status": "Running",
+    "test_int": 200,
+    "test_float": 4.56,
+    "test_string": "world"
+  },
+  {
+    "id": 5,
+    "name": "backup-server",
+    "cpu_cores": 4,
+    "load_avg": 1.5,
+    "cpu_usage": "0m",
+    "memory_usage": "0Mi",
+    "status": "Idle",
+    "test_int": 0,
+    "test_float": 0.00,
+    "test_string": ""
   }
 ]
 EOF
@@ -390,4 +414,45 @@ EOF
 
 echo -e "\nTestC 2-H: All available summary types for floating point data"
 echo "---------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 2-I: Blanks and nonblanks summaries
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "columns": [
+    {
+      "header": "Test Int",
+      "key": "test_int",
+      "datatype": "int",
+      "justification": "right",
+      "summary": "blanks"
+    },
+    {
+      "header": "Test Float",
+      "key": "test_float",
+      "datatype": "float",
+      "justification": "right",
+      "summary": "nonblanks"
+    },
+    {
+      "header": "Test String",
+      "key": "test_string",
+      "datatype": "text",
+      "justification": "left",
+      "summary": "blanks"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "left",
+      "summary": "nonblanks"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTestC 2-I: Blanks and nonblanks summaries"
+echo "------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"

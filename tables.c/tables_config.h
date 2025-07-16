@@ -45,7 +45,9 @@ typedef enum {
     SUMMARY_MAX,
     SUMMARY_AVG,
     SUMMARY_COUNT,
-    SUMMARY_UNIQUE
+    SUMMARY_UNIQUE,
+    SUMMARY_BLANKS,
+    SUMMARY_NONBLANKS
 } SummaryType;
 
 /* Enumeration for wrap modes */

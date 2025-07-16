@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jansson.h>
+#include <stdbool.h>
 #include "tables_data.h"
 
 /*
@@ -187,6 +188,8 @@ void initialize_summaries(TableConfig *config, TableData *data) {
         stats->min_initialized = 0; // Flag to indicate if min has been set
         stats->max_initialized = 0; // Flag to indicate if max has been set
         stats->max_decimal_places = 0; // Initialize max decimal places for float data
+        stats->blanks = 0;
+        stats->nonblanks = 0;
     }
 }
 
@@ -254,7 +257,43 @@ static int count_decimal_places(const char *value) {
  */
 void update_summaries(int col_idx, const char *value, DataType data_type, SummaryType summary_type, SummaryStats *stats) {
     extern int debug_mode;
-    if (value == NULL || strcmp(value, "null") == 0) {
+    
+    bool is_null = (value == NULL || strcmp(value, "null") == 0);
+    bool is_blank = is_null || (value && strcmp(value, "") == 0);
+    
+    if (!is_blank) {
+        double num_val = 0.0;
+        bool is_numeric = (data_type == DATA_INT || data_type == DATA_NUM || data_type == DATA_FLOAT ||
+                           data_type == DATA_KCPU || data_type == DATA_KMEM);
+        
+        if (is_numeric) {
+            if (data_type == DATA_KCPU && strstr(value, "m") != NULL) {
+                char *num_part = strdup(value);
+                num_part[strlen(num_part) - 1] = '\0';
+                num_val = atof(num_part);
+                free(num_part);
+            } else if (data_type == DATA_KMEM) {
+                char *num_part = strdup(value);
+                char *unit = strstr(num_part, "M") ? strstr(num_part, "M") :
+                             strstr(num_part, "G") ? strstr(num_part, "G") :
+                             strstr(num_part, "K") ? strstr(num_part, "K") : NULL;
+                if (unit) *unit = '\0';
+                num_val = atof(num_part);
+                free(num_part);
+            } else {
+                num_val = atof(value);
+            }
+            if (num_val == 0.0) is_blank = true;
+        }
+    }
+    
+    if (is_blank) {
+        stats->blanks++;
+    } else {
+        stats->nonblanks++;
+    }
+    
+    if (is_null) {
         return;
     }
     

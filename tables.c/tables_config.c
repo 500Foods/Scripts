@@ -67,6 +67,8 @@ static SummaryType parse_summary_type(const char *str) {
     if (strcasecmp(str, "avg") == 0) return SUMMARY_AVG;
     if (strcasecmp(str, "count") == 0) return SUMMARY_COUNT;
     if (strcasecmp(str, "unique") == 0) return SUMMARY_UNIQUE;
+    if (strcasecmp(str, "blanks") == 0) return SUMMARY_BLANKS;
+    if (strcasecmp(str, "nonblanks") == 0) return SUMMARY_NONBLANKS;
     return SUMMARY_NONE;
 }
 

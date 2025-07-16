@@ -25,7 +25,10 @@ cat > "$data_file" << 'EOF'
     "load_avg": 2.45,
     "cpu_usage": "1250m",
     "memory_usage": "2048Mi",
-    "status": "Running"
+    "status": "Running",
+    "test_int": 100,
+    "test_float": 1.23,
+    "test_string": "hello"
   },
   {
     "id": 2,
@@ -33,8 +36,11 @@ cat > "$data_file" << 'EOF'
     "cpu_cores": 8,
     "load_avg": 5.12,
     "cpu_usage": "3200m",
-    "memory_usage": "8192Mi", 
-    "status": "Running"
+    "memory_usage": "8192Mi",
+    "status": "Running",
+    "test_int": 0,
+    "test_float": 0.0,
+    "test_string": ""
   },
   {
     "id": 3,
@@ -43,7 +49,10 @@ cat > "$data_file" << 'EOF'
     "load_avg": 0.85,
     "cpu_usage": "500m",
     "memory_usage": "1024Mi",
-    "status": "Starting"
+    "status": "Starting",
+    "test_int": null,
+    "test_float": null,
+    "test_string": null
   },
   {
     "id": 4,
@@ -52,7 +61,22 @@ cat > "$data_file" << 'EOF'
     "load_avg": 3.21,
     "cpu_usage": "2100m",
     "memory_usage": "4096Mi",
-    "status": "Running"
+    "status": "Running",
+    "test_int": 200,
+    "test_float": 4.56,
+    "test_string": "world"
+  },
+  {
+    "id": 5,
+    "name": "backup-server",
+    "cpu_cores": 4,
+    "load_avg": 1.5,
+    "cpu_usage": "0m",
+    "memory_usage": "0Mi",
+    "status": "Idle",
+    "test_int": 0,
+    "test_float": 0.00,
+    "test_string": ""
   }
 ]
 EOF
@@ -88,7 +112,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo "Test 2-A: Basic sum and count summaries"
-echo "---------------------------------------"
+echo "-----------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-B: Min and max summaries for numeric types (Theme: Blue)
@@ -122,7 +146,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-B: Min and max summaries for numeric types"
-echo "--------------------------------------------------"
+echo "----------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-C: Kubernetes resource summaries - kcpu and kmem (Theme: Red)
@@ -156,7 +180,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-C: Kubernetes resource summaries - kcpu and kmem"
-echo "-------------------------------------------------------"
+echo "---------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-D: Unique value summaries (Theme: Blue)
@@ -190,7 +214,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-D: Unique value summaries"
-echo "---------------------------------"
+echo "-----------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-E: Mixed summaries across all datatypes (Theme: Red)
@@ -245,7 +269,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-E: Mixed summaries across all datatypes"
-echo "-----------------------------------------------"
+echo "-------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-F: No summaries vs summaries comparison (Theme: Blue)
@@ -279,7 +303,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-F: No summaries vs summaries comparison"
-echo "-----------------------------------------------"
+echo "-------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-G: All available summary types for numeric data (Theme: Red)
@@ -334,7 +358,7 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-G: All available summary types for numeric data"
-echo "-------------------------------------------------------"
+echo "---------------------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
 
 # Test 2-H: All available summary types for floating point data (Theme: Blue)
@@ -389,5 +413,46 @@ cat > "$layout_file" << 'EOF'
 EOF
 
 echo -e "\nTest 2-H: All available summary types for floating point data"
-echo "-------------------------------------------------------------"
+echo "---------------------------------------------------------------"
+"$tables_script" "$layout_file" "$data_file"
+
+# Test 2-I: Blanks and nonblanks summaries
+cat > "$layout_file" << 'EOF'
+{
+  "theme": "Red",
+  "columns": [
+    {
+      "header": "Test Int",
+      "key": "test_int",
+      "datatype": "int",
+      "justification": "right",
+      "summary": "blanks"
+    },
+    {
+      "header": "Test Float",
+      "key": "test_float",
+      "datatype": "float",
+      "justification": "right",
+      "summary": "nonblanks"
+    },
+    {
+      "header": "Test String",
+      "key": "test_string",
+      "datatype": "text",
+      "justification": "left",
+      "summary": "blanks"
+    },
+    {
+      "header": "Status",
+      "key": "status",
+      "datatype": "text",
+      "justification": "left",
+      "summary": "nonblanks"
+    }
+  ]
+}
+EOF
+
+echo -e "\nTest 2-I: Blanks and nonblanks summaries"
+echo "------------------------------------------"
 "$tables_script" "$layout_file" "$data_file"
