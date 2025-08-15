@@ -13,7 +13,7 @@
 #include "tables_data.h"
 #include "tables_render.h"
 
-#define VERSION "0.1.0"
+#define VERSION "1.0.1"
 
 /* Function prototypes */
 void print_help(void);
@@ -28,20 +28,24 @@ int debug_layout = 0;
 
 int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
+    
+    // Check for help and version flags first, before validating argument count
+    if (argc >= 2) {
+        if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+            print_help();
+            return 0;
+        }
+
+        if (strcmp(argv[1], "--version") == 0) {
+            print_version();
+            return 0;
+        }
+    }
+    
     if (argc < 3) {
         fprintf(stderr, "Error: Both layout and data JSON files are required\n");
         print_help();
         return 1;
-    }
-
-    if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
-        print_help();
-        return 0;
-    }
-
-    if (strcmp(argv[1], "--version") == 0) {
-        print_version();
-        return 0;
     }
 
     const char *layout_file = argv[1];
